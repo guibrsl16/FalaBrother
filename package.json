@@ -1,0 +1,41 @@
+{
+  "name": "brotherat",
+  "productName": "Brotherhood Cursos",
+  "version": "1.0.0",
+  "description": "Brotherhood Cursos - central de atendimento: conversas do WhatsApp respondidas por agentes de IA (Claude Sonnet 5), um agente para cada curso.",
+  "author": "Brotherhood Cursos",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/dev.js",
+    "dev": "node scripts/dev.js",
+    "servidor": "node servidor/index.js",
+    "web": "vite",
+    "build": "vite build",
+    "verificar": "tsc --noEmit && vite build",
+    "producao": "npm run build && node servidor/index.js",
+    "redefinir-2fa": "node scripts/redefinir-2fa.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "express": "^4.21.2",
+    "pino": "^10.4.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
+  }
+}
