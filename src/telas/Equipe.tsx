@@ -113,12 +113,6 @@ export function CartaoEquipe() {
         </button>
       </div>
 
-      <div className="dica" style={{ marginBottom: 10 }}>
-        Quem pode entrar no sistema. Quem <strong>administra</strong> vê esta lista, cadastra, remove e
-        define senhas, conecta números e refaz as 2 etapas; quem <strong>atende</strong> usa todo o resto
-        normalmente.
-      </div>
-
       {pessoas === null ? (
         <div className="esmaecido" style={{ fontSize: 13 }}>
           carregando…

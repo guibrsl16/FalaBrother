@@ -1,6 +1,7 @@
 /**
- * Ajustes: chave da IA, comportamento do atendimento automático, horário e
- * aparência. Tudo o que se mexe uma vez e não se olha mais.
+ * Ajustes: chave da IA, comportamento do atendimento automático, horário,
+ * aparência, equipe e conta — organizados em abas para não empilhar tudo de
+ * uma vez na tela.
  */
 import { useEffect, useState } from 'react'
 import { useLoja } from '../estado'
@@ -20,12 +21,14 @@ const DIAS = [
   { valor: 6, nome: 'Sáb' },
 ]
 
+type Aba = 'ia' | 'horario' | 'aparencia' | 'equipe' | 'conta'
+
 export default function AjustesTela() {
   const loja = useLoja()
   const { ajustes } = loja
-  // a lista da equipe é só de quem administra
   const administra = loja.sessao?.usuario?.papel === 'admin'
 
+  const [aba, setAba] = useState<Aba>('ia')
   const [rascunho, setRascunho] = useState<TipoAjustes | null>(null)
   const [chave, setChave] = useState('')
 
@@ -67,88 +70,109 @@ export default function AjustesTela() {
     }
   }
 
+  const ABAS: { chave: Aba; nome: string }[] = [
+    { chave: 'ia', nome: 'Inteligência artificial' },
+    { chave: 'horario', nome: 'Horário' },
+    { chave: 'aparencia', nome: 'Aparência' },
+    ...(administra ? [{ chave: 'equipe' as Aba, nome: 'Equipe' }] : []),
+    { chave: 'conta', nome: 'Minha conta' },
+  ]
+
+  const temSalvar = aba === 'ia' || aba === 'horario' || aba === 'aparencia'
+
   return (
     <>
       <div className="conteudo-cabecalho">
         <div>
           <h1>Ajustes</h1>
         </div>
-        <button className="btn primario" onClick={salvar}>
-          Salvar ajustes
-        </button>
+        {temSalvar && (
+          <button className="btn primario" onClick={salvar}>
+            Salvar
+          </button>
+        )}
       </div>
 
-      <div className="grade g2">
-        {/* ---------------- IA ---------------- */}
-        <div className="cartao">
-          <div className="cartao-cabecalho">
-            <div className="cartao-titulo">Inteligência artificial</div>
-            <span className={`etiqueta ${ajustes.anthropicApiKey.preenchido ? 'verde' : 'vermelha'}`}>
-              {ajustes.anthropicApiKey.preenchido ? 'chave salva' : 'sem chave'}
-            </span>
-          </div>
+      <div className="opcoes" style={{ marginBottom: 16 }}>
+        {ABAS.map((a) => (
+          <button key={a.chave} className={aba === a.chave ? 'ativo' : ''} onClick={() => setAba(a.chave)}>
+            {a.nome}
+          </button>
+        ))}
+      </div>
 
-          <div className="pilha">
-            <Campo
-              rotulo="Chave da API da Anthropic"
-              dica={
-                ajustes.anthropicApiKey.preenchido
-                  ? `Termina em ${ajustes.anthropicApiKey.fim}. Vazio mantém a atual.`
-                  : 'console.anthropic.com'
-              }
-            >
-              <input
-                type="password"
-                value={chave}
-                onChange={(e) => setChave(e.target.value)}
-                placeholder={ajustes.anthropicApiKey.preenchido ? '••••••••••••' : 'sk-ant-…'}
-              />
-            </Campo>
-
-            <div className="par" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
-              <span style={{ color: 'var(--txt-3)' }}>Modelo dos agentes</span>
-              <strong className="mono">{loja.canal.modelo}</strong>
+      {aba === 'ia' && (
+        <div className="grade g2">
+          <div className="cartao">
+            <div className="cartao-cabecalho">
+              <div className="cartao-titulo">Chave da IA</div>
+              <span className={`etiqueta ${ajustes.anthropicApiKey.preenchido ? 'verde' : 'vermelha'}`}>
+                {ajustes.anthropicApiKey.preenchido ? 'chave salva' : 'sem chave'}
+              </span>
             </div>
 
-            <div className="divisor" />
+            <div className="pilha">
+              <Campo
+                rotulo="Chave da API da Anthropic"
+                dica={
+                  ajustes.anthropicApiKey.preenchido
+                    ? `Termina em ${ajustes.anthropicApiKey.fim}. Vazio mantém a atual.`
+                    : 'console.anthropic.com'
+                }
+              >
+                <input
+                  type="password"
+                  value={chave}
+                  onChange={(e) => setChave(e.target.value)}
+                  placeholder={ajustes.anthropicApiKey.preenchido ? '••••••••••••' : 'sk-ant-…'}
+                />
+              </Campo>
 
-            <Interruptor ligado={rascunho.iaLigada} aoMudar={(v) => mexer({ iaLigada: v })}>
-              Atendimento automático ligado
-            </Interruptor>
+              <div className="par" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                <span style={{ color: 'var(--txt-3)' }}>Modelo dos agentes</span>
+                <strong className="mono">{loja.canal.modelo}</strong>
+              </div>
+
+              <div className="divisor" />
+
+              <Interruptor ligado={rascunho.iaLigada} aoMudar={(v) => mexer({ iaLigada: v })}>
+                Atendimento automático ligado
+              </Interruptor>
+            </div>
+          </div>
+
+          <div className="cartao">
+            <div className="cartao-cabecalho">
+              <div className="cartao-titulo">Comportamento</div>
+            </div>
+
+            <div className="pilha">
+              <Campo rotulo="Espera antes de responder (segundos)">
+                <input
+                  type="number"
+                  min={0}
+                  max={60}
+                  value={rascunho.segundosDeEspera}
+                  onChange={(e) => mexer({ segundosDeEspera: Number(e.target.value) })}
+                />
+              </Campo>
+
+              <Campo rotulo="Memória (mensagens)">
+                <input
+                  type="number"
+                  min={4}
+                  max={100}
+                  value={rascunho.memoriaDeMensagens}
+                  onChange={(e) => mexer({ memoriaDeMensagens: Number(e.target.value) })}
+                />
+              </Campo>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* ---------------- comportamento ---------------- */}
-        <div className="cartao">
-          <div className="cartao-cabecalho">
-            <div className="cartao-titulo">Como o agente se comporta</div>
-          </div>
-
-          <div className="pilha">
-            <Campo rotulo="Espera antes de responder (segundos)">
-              <input
-                type="number"
-                min={0}
-                max={60}
-                value={rascunho.segundosDeEspera}
-                onChange={(e) => mexer({ segundosDeEspera: Number(e.target.value) })}
-              />
-            </Campo>
-
-            <Campo rotulo="Memória (mensagens)">
-              <input
-                type="number"
-                min={4}
-                max={100}
-                value={rascunho.memoriaDeMensagens}
-                onChange={(e) => mexer({ memoriaDeMensagens: Number(e.target.value) })}
-              />
-            </Campo>
-          </div>
-        </div>
-
-        {/* ---------------- horário ---------------- */}
-        <div className="cartao">
+      {aba === 'horario' && (
+        <div className="cartao" style={{ maxWidth: 520 }}>
           <div className="cartao-cabecalho">
             <div className="cartao-titulo">Horário de atendimento</div>
           </div>
@@ -212,9 +236,10 @@ export default function AjustesTela() {
             )}
           </div>
         </div>
+      )}
 
-        {/* ---------------- aparência ---------------- */}
-        <div className="cartao">
+      {aba === 'aparencia' && (
+        <div className="cartao" style={{ maxWidth: 520 }}>
           <div className="cartao-cabecalho">
             <div className="cartao-titulo">
               <IconeTema tamanho={15} /> Aparência
@@ -245,17 +270,10 @@ export default function AjustesTela() {
             </Campo>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ---------------- quem entra ---------------- */}
-      <div className="grade g2" style={{ marginTop: 16 }}>
-        {administra && <CartaoEquipe />}
-        <CartaoMinhaConta />
-      </div>
-
-      <div className="dica" style={{ marginTop: 14, textAlign: 'center' }}>
-        Dados em <span className="mono">dados/</span> — cópia de segurança é copiar essa pasta.
-      </div>
+      {aba === 'equipe' && administra && <CartaoEquipe />}
+      {aba === 'conta' && <CartaoMinhaConta />}
     </>
   )
 }

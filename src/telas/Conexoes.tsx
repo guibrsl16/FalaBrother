@@ -372,12 +372,7 @@ function ModalNovaConexao({ aoFechar }: { aoFechar: () => void }) {
           Sincronizar as conversas e os contatos que já existem neste número
         </Interruptor>
         <div className="dica">
-          Ao ler o QR, o celular envia as conversas recentes e a agenda: contatos salvos aparecem com o
-          nome, e quem não está na agenda aparece pelo número. É o WhatsApp do celular quem decide quanto
-          histórico enviar — o histórico completo de anos não é possível por esta conexão. As conversas
-          importadas entram como <strong>resolvidas</strong>: o agente não responde a nada do passado, e a
-          conversa reabre sozinha quando o cliente escrever de novo.{' '}
-          <strong>Elas ficarão visíveis para toda a equipe</strong>; se for um número pessoal, desligue.
+          <strong>Ficam visíveis para toda a equipe.</strong> Se for um número pessoal, desligue.
         </div>
       </div>
     </Modal>

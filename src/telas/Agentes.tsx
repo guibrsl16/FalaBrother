@@ -23,6 +23,7 @@ export default function Agentes() {
   const loja = useLoja()
   const { agentes, cursos, conversas, canal } = loja
   const [editando, setEditando] = useState<Agente | null>(null)
+  const [testando, setTestando] = useState(false)
 
   const conversasPorAgente = useMemo(() => {
     const mapa: Record<string, number> = {}
@@ -68,6 +69,11 @@ export default function Agentes() {
           </p>
         </div>
         <div className="fila">
+          {agentes.length > 0 && (
+            <button className="btn" onClick={() => setTestando(true)}>
+              <IconeFaisca tamanho={15} /> Testar agente
+            </button>
+          )}
           <button className="btn primario" onClick={() => criar()}>
             <IconeMais tamanho={15} /> Novo agente
           </button>
@@ -156,7 +162,32 @@ export default function Agentes() {
           aoFechar={() => setEditando(null)}
         />
       )}
+      {testando && <ModalTestarAgente agentes={agentes} aoFechar={() => setTestando(false)} />}
     </>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Testar qualquer agente, sem abrir o editor completo                 */
+/* ------------------------------------------------------------------ */
+
+function ModalTestarAgente({ agentes, aoFechar }: { agentes: Agente[]; aoFechar: () => void }) {
+  const [agenteId, setAgenteId] = useState(agentes.find((a) => a.ativo)?.id || agentes[0]?.id || '')
+  const agente = agentes.find((a) => a.id === agenteId) || agentes[0]
+
+  return (
+    <Modal largo titulo="Testar agente" subtitulo={agente?.nome} aoFechar={aoFechar}>
+      <Campo rotulo="Agente">
+        <select value={agenteId} onChange={(e) => setAgenteId(e.target.value)}>
+          {agentes.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.nome} {a.ativo ? '' : '(desligado)'}
+            </option>
+          ))}
+        </select>
+      </Campo>
+      {agente && <BancoDeProvas agente={agente} key={agente.id} />}
+    </Modal>
   )
 }
 
