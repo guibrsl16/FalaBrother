@@ -1560,6 +1560,23 @@ button.etiqueta {
   border-radius: var(--r-lg);
 }
 
+.gravando-audio {
+  align-items: center !important;
+  padding: 9px 14px;
+  border-radius: var(--r-lg);
+  background: var(--vermelho-fundo);
+  border: 1px solid rgba(var(--vermelho-rgb), 0.3);
+}
+
+.ponto-gravando {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border-radius: 50%;
+  background: var(--vermelho);
+  animation: pulsar 900ms infinite;
+}
+
 .enviar {
   width: 40px;
   height: 40px;

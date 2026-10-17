@@ -132,6 +132,28 @@ rotas.post('/conversas/:id/mensagens', async (req, res) => {
   res.json(mensagem)
 })
 
+/** Áudio gravado na hora pela tela, em base64 — um recado curto, não espera arquivo grande. */
+rotas.post('/conversas/:id/mensagens/audio', async (req, res) => {
+  const base64 = String(req.body?.audioBase64 || '')
+  const mimetype = String(req.body?.mimetype || 'audio/ogg')
+  if (!base64) return res.status(400).json({ erro: 'Áudio vazio.' })
+  const conv = estado.conversa(req.params.id)
+  if (!conv) return res.status(404).json({ erro: 'Conversa não encontrada.' })
+  let bytes
+  try {
+    bytes = Buffer.from(base64, 'base64')
+  } catch {
+    return res.status(400).json({ erro: 'Áudio inválido.' })
+  }
+  if (!bytes.length) return res.status(400).json({ erro: 'Áudio vazio.' })
+  try {
+    const mensagem = await atendimento.enviarAudioComoAtendente(req.params.id, bytes, mimetype)
+    res.json(mensagem)
+  } catch (erro) {
+    res.status(400).json({ erro: erro.message })
+  }
+})
+
 rotas.patch('/conversas/:id', (req, res) => {
   const permitido = {}
   const corpo = req.body || {}

@@ -433,6 +433,38 @@ export async function enviarComoAtendente(conversaId, texto) {
   return mensagem
 }
 
+/**
+ * Uma pessoa da equipe gravou um áudio pela tela. Só funciona em conexão por
+ * QR Code — mandar áudio pela API oficial da Meta exigiria subir o arquivo
+ * num endpoint à parte da Graph API, que este sistema ainda não implementa.
+ */
+export async function enviarAudioComoAtendente(conversaId, bytes, mimetype) {
+  const conv = estado.conversa(conversaId)
+  if (!conv) return null
+  if (!conv.conexaoId) {
+    throw new Error('Enviar áudio só funciona em números conectados por QR Code, por enquanto.')
+  }
+
+  const mensagem = estado.registrarMensagem(conversaId, {
+    de: 'atendente',
+    texto: 'Áudio enviado',
+    tipo: 'audio',
+    anexo: { tipo: 'audio', mimetype },
+    status: 'enviando',
+  })
+
+  try {
+    const waId = await conexoes.enviarAudio(conv.conexaoId, conv.jid || conv.telefone, bytes, mimetype)
+    lembrarEnviada(waId, conv.id)
+    estado.atualizarMensagem(conv.id, mensagem.id, { status: 'enviada', waId })
+  } catch (erro) {
+    estado.atualizarMensagem(conv.id, mensagem.id, { status: 'falhou', erro: erro.message })
+  }
+
+  estado.atualizarConversa(conversaId, { estado: 'humano', naoLidas: 0 })
+  return mensagem
+}
+
 /* ------------------------------------------------------------------ */
 /* Comandos da tela                                                    */
 /* ------------------------------------------------------------------ */

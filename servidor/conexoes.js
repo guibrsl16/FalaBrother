@@ -1198,6 +1198,41 @@ export async function enviarTexto(conexaoId, destino, texto) {
   return resultado?.key?.id || messageId
 }
 
+/**
+ * Manda um áudio gravado pela tela. Vai como arquivo de áudio comum (não
+ * como a "bolinha" de mensagem de voz nativa — isso exigiria converter para
+ * OGG/Opus no servidor, o que significa instalar ffmpeg na imagem; o arquivo
+ * chega e toca do mesmo jeito, só sem o visual arredondado do WhatsApp).
+ * Devolve o id da mensagem no WhatsApp.
+ */
+export async function enviarAudio(conexaoId, destino, bytes, mimetype) {
+  const r = rts.get(conexaoId)
+  if (!r?.sock || r.estado !== 'conectada') {
+    throw new Error('O número desta conversa está desconectado. Reconecte em Conexões.')
+  }
+  const messageId = generateMessageID()
+  r.enviadas.add(messageId)
+  if (r.enviadas.size > 500) r.enviadas.delete(r.enviadas.values().next().value)
+  const resultado = await r.sock.sendMessage(
+    paraJid(destino),
+    { audio: bytes, mimetype: mimetype || 'audio/ogg', ptt: false },
+    { messageId },
+  )
+  const waId = resultado?.key?.id || messageId
+  salvarMidiaEnviada(conexaoId, waId, bytes)
+  return waId
+}
+
+/** Guarda em disco o áudio que ACABAMOS de enviar, para a própria tela poder tocá-lo de volta (rota /midia). */
+function salvarMidiaEnviada(conexaoId, waId, bytes) {
+  try {
+    fs.mkdirSync(pastaMidia(conexaoId), { recursive: true })
+    fs.writeFileSync(arquivoMidia(conexaoId, waId), bytes)
+  } catch (erro) {
+    console.warn('[conexões] não consegui guardar o áudio enviado para tocar depois:', erro.message)
+  }
+}
+
 /** O visto azul. Falhar aqui não pode atrapalhar o atendimento. */
 export async function marcarComoLida(conexaoId, chave) {
   const r = rts.get(conexaoId)

@@ -102,6 +102,8 @@ export const api = {
   marcarLida: (id: string) => enviarJson('POST')(`/conversas/${id}/lida`) as Promise<Conversa>,
   responderComoAtendente: (id: string, texto: string) =>
     enviarJson('POST')(`/conversas/${id}/mensagens`, { texto }) as Promise<Mensagem>,
+  enviarAudio: (id: string, audioBase64: string, mimetype: string) =>
+    enviarJson('POST')(`/conversas/${id}/mensagens/audio`, { audioBase64, mimetype }) as Promise<Mensagem>,
   atualizarConversa: (id: string, mudancas: Partial<Conversa>) =>
     enviarJson('PATCH')(`/conversas/${id}`, mudancas) as Promise<Conversa>,
   buscarMensagensAntigas: (id: string) => enviarJson('POST')(`/conversas/${id}/buscar-antigas`),

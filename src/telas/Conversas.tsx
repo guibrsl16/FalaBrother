@@ -34,6 +34,7 @@ import {
   IconeFechar,
   IconeLixeira,
   IconeMais,
+  IconeMicrofone,
   IconePessoa,
   IconeRelogio,
   IconeResolver,
@@ -270,6 +271,7 @@ function Conversa({ conversa, digitando }: { conversa: Conversa; digitando: bool
   const { mensagens, carregando } = loja.usarMensagens(conversa.id)
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [gravando, setGravando] = useState(false)
   const fim = useRef<HTMLDivElement>(null)
 
   const agente = loja.agentes.find((a) => a.id === conversa.agenteId)
@@ -299,6 +301,18 @@ function Conversa({ conversa, digitando }: { conversa: Conversa; digitando: bool
       setTexto('')
     } catch (erro) {
       loja.avisar(erro instanceof Error ? erro.message : 'Não consegui enviar.', 'erro')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  async function enviarAudioGravado(blob: Blob, mimetype: string) {
+    setEnviando(true)
+    try {
+      const base64 = await blobParaBase64(blob)
+      await api.enviarAudio(conversa.id, base64, mimetype)
+    } catch (erro) {
+      loja.avisar(erro instanceof Error ? erro.message : 'Não consegui enviar o áudio.', 'erro')
     } finally {
       setEnviando(false)
     }
@@ -436,25 +450,153 @@ function Conversa({ conversa, digitando }: { conversa: Conversa; digitando: bool
             {avisoDeCanal}
           </div>
         )}
-        <div className="linha">
-          <textarea
-            placeholder="Escreva sua resposta…  (Enter envia, Shift+Enter quebra linha)"
-            value={texto}
-            rows={1}
-            onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                enviar()
-              }
+        {gravando ? (
+          <GravadorDeAudio
+            podeGravar={!avisoDeCanal}
+            onCancelar={() => setGravando(false)}
+            onEnviar={async (blob, mimetype) => {
+              setGravando(false)
+              await enviarAudioGravado(blob, mimetype)
             }}
           />
-          <button className="enviar" onClick={enviar} disabled={!texto.trim() || enviando} title="Enviar">
-            <IconeEnviar tamanho={18} />
-          </button>
-        </div>
+        ) : (
+          <div className="linha">
+            <textarea
+              placeholder="Escreva sua resposta…  (Enter envia, Shift+Enter quebra linha)"
+              value={texto}
+              rows={1}
+              onChange={(e) => setTexto(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  enviar()
+                }
+              }}
+            />
+            {texto.trim() ? (
+              <button className="enviar" onClick={enviar} disabled={enviando} title="Enviar">
+                <IconeEnviar tamanho={18} />
+              </button>
+            ) : (
+              <button
+                className="enviar"
+                onClick={() => setGravando(true)}
+                disabled={enviando || Boolean(avisoDeCanal)}
+                title="Gravar áudio"
+              >
+                <IconeMicrofone tamanho={18} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </section>
+  )
+}
+
+function blobParaBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader()
+    leitor.onloadend = () => {
+      const resultado = String(leitor.result || '')
+      // "data:audio/webm;base64,AAAA…" — só a parte depois da vírgula interessa
+      resolve(resultado.slice(resultado.indexOf(',') + 1))
+    }
+    leitor.onerror = () => reject(leitor.error)
+    leitor.readAsDataURL(blob)
+  })
+}
+
+function formatarTempo(segundos: number) {
+  const m = Math.floor(segundos / 60)
+  const s = segundos % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+/**
+ * Grava um áudio pelo microfone do navegador enquanto está montado — pede
+ * permissão assim que aparece, e para sozinho se o componente sumir (ex.:
+ * trocou de conversa no meio da gravação), sem mandar nada nesse caso.
+ */
+function GravadorDeAudio({
+  podeGravar,
+  onCancelar,
+  onEnviar,
+}: {
+  podeGravar: boolean
+  onCancelar: () => void
+  onEnviar: (blob: Blob, mimetype: string) => void
+}) {
+  const loja = useLoja()
+  const [segundos, setSegundos] = useState(0)
+  const gravadorRef = useRef<MediaRecorder | null>(null)
+  const pedacosRef = useRef<Blob[]>([])
+  const enviarAoPararRef = useRef(false)
+
+  useEffect(() => {
+    if (!podeGravar) {
+      loja.avisar('Esta conversa não está ligada a um número conectado — não dá para enviar áudio.', 'erro')
+      onCancelar()
+      return
+    }
+    let cancelado = false
+    let timer: number | undefined
+
+    navigator.mediaDevices
+      ?.getUserMedia({ audio: true })
+      .then((stream) => {
+        if (cancelado) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        const gravador = new MediaRecorder(stream)
+        pedacosRef.current = []
+        gravador.ondataavailable = (e) => {
+          if (e.data.size > 0) pedacosRef.current.push(e.data)
+        }
+        gravador.onstop = () => {
+          stream.getTracks().forEach((t) => t.stop())
+          if (enviarAoPararRef.current && pedacosRef.current.length) {
+            onEnviar(new Blob(pedacosRef.current, { type: gravador.mimeType }), gravador.mimeType)
+          }
+        }
+        gravador.start()
+        gravadorRef.current = gravador
+        timer = window.setInterval(() => setSegundos((s) => s + 1), 1000)
+      })
+      .catch(() => {
+        loja.avisar('Não consegui acessar o microfone — confira a permissão do navegador.', 'erro')
+        onCancelar()
+      })
+
+    return () => {
+      cancelado = true
+      if (timer) window.clearInterval(timer)
+      // some o componente (trocou de conversa, por ex.) sem ter clicado enviar: descarta
+      enviarAoPararRef.current = false
+      if (gravadorRef.current && gravadorRef.current.state !== 'inactive') gravadorRef.current.stop()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function parar(enviar: boolean) {
+    enviarAoPararRef.current = enviar
+    if (gravadorRef.current && gravadorRef.current.state !== 'inactive') gravadorRef.current.stop()
+  }
+
+  return (
+    <div className="linha gravando-audio">
+      <span className="ponto-gravando" />
+      <span className="crescer" style={{ fontSize: 13, color: 'var(--txt-2)' }}>
+        Gravando… {formatarTempo(segundos)}
+      </span>
+      <button className="btn-icone" onClick={() => parar(false)} title="Cancelar">
+        <IconeFechar tamanho={16} />
+      </button>
+      <button className="enviar" onClick={() => parar(true)} title="Enviar áudio">
+        <IconeEnviar tamanho={18} />
+      </button>
+    </div>
   )
 }
 
