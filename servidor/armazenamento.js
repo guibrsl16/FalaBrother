@@ -101,6 +101,7 @@ const cacheMensagens = new Map()
  */
 export async function carregar() {
   if (!USANDO_BANCO) {
+    console.log('[dados] modo arquivo — DATABASE_URL vazio, lendo de', PASTA_DADOS)
     for (const nome of COLECOES) memoria[nome] = lerArquivo(nome, null)
     return
   }
@@ -110,6 +111,10 @@ export async function carregar() {
   const { rows } = await pool.query('select nome, valor from colecoes')
   const porNome = new Map(rows.map((r) => [r.nome, r.valor]))
   for (const nome of COLECOES) memoria[nome] = porNome.has(nome) ? porNome.get(nome) : null
+  console.log(
+    '[dados] modo banco — carregado do Postgres:',
+    COLECOES.map((n) => `${n}=${Array.isArray(memoria[n]) ? memoria[n].length : memoria[n] == null ? 'vazio' : 'ok'}`).join(', '),
+  )
 
   const { rows: msgRows } = await pool.query('select conversa_id, lista from mensagens')
   for (const row of msgRows) cacheMensagens.set(row.conversa_id, row.lista)
@@ -119,6 +124,13 @@ const gravacaoPendente = new Set()
 let timerGravacao = null
 
 async function gravarColecao(nome) {
+  // cursos e agentes mudam pouco — logar aqui ajuda a rastrear uma gravação
+  // inesperada (ex.: memória antiga de antes de um restart sobrescrevendo o
+  // que outra pessoa/processo gravou depois).
+  if (nome === 'cursos' || nome === 'agentes') {
+    const valor = memoria[nome]
+    console.log(`[dados] gravando ${nome} (${Array.isArray(valor) ? valor.length : 0} itens)`)
+  }
   if (!USANDO_BANCO) {
     gravarArquivo(caminho(nome), memoria[nome])
     return
