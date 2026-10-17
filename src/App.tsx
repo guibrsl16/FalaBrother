@@ -6,6 +6,7 @@ import {
   IconeAgentes,
   IconeAjustes,
   IconeConexoes,
+  IconeContatos,
   IconeConversas,
   IconeCursos,
   IconeDashboard,
@@ -16,6 +17,7 @@ import {
 } from './componentes/Icones'
 import Conexoes from './telas/Conexoes'
 import Conversas from './telas/Conversas'
+import Contatos from './telas/Contatos'
 import Agentes from './telas/Agentes'
 import CursosTela from './telas/Cursos'
 import Painel from './telas/Painel'
@@ -66,6 +68,14 @@ const TELAS = [
     grupo: 'Comercial',
     icone: IconeDashboard,
     descricao: 'Leads, funil de interesse e quantas matrículas já fecharam.',
+    cheia: false,
+  },
+  {
+    chave: 'contatos',
+    nome: 'Contatos',
+    grupo: 'Comercial',
+    icone: IconeContatos,
+    descricao: 'Todo mundo que já escreveu — separado em Cliente e Lead.',
     cheia: false,
   },
   {
@@ -305,6 +315,7 @@ export default function App() {
           {tela === 'conversas' && <Conversas />}
           {tela === 'painel' && <Painel aoIrPara={setTela} />}
           {tela === 'dashboard' && <Dashboard aoIrPara={setTela} />}
+          {tela === 'contatos' && <Contatos aoIrPara={setTela} />}
           {tela === 'agentes' && <Agentes />}
           {tela === 'cursos' && <CursosTela />}
           {tela === 'canal' && <Canal />}

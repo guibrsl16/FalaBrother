@@ -236,6 +236,24 @@ export function SeloEtapa({ etapa }: { etapa?: string }) {
   return <span className={`etiqueta ${classeEtapa(etapa)}`}>{rotuloEtapa(etapa)}</span>
 }
 
+/**
+ * A visão simples de "quem é essa pessoa" para a tela de Contatos: cliente
+ * (já matriculou) ou lead (ainda não). É a mesma etapa do funil — "cliente"
+ * é só como a etapa "matriculado" aparece fora do Dashboard, com um nome que
+ * qualquer um da equipe entende de cara.
+ */
+export function ehCliente(conversa: { lead?: { etapa?: string } }) {
+  return conversa.lead?.etapa === 'matriculado'
+}
+
+export function SeloTipoContato({ conversa }: { conversa: { lead?: { etapa?: string } } }) {
+  return ehCliente(conversa) ? (
+    <span className="etiqueta azul">Cliente</span>
+  ) : (
+    <span className="etiqueta laranja">Lead</span>
+  )
+}
+
 /* ------------------------------------------------------------------ */
 /* Datas e texto                                                       */
 /* ------------------------------------------------------------------ */

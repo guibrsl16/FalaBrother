@@ -166,6 +166,16 @@ export const IconePessoa = (p: Props) => (
   </Svg>
 )
 
+/** Contatos: a agenda — um cartão com a pessoa dentro. */
+export const IconeContatos = (p: Props) => (
+  <Svg {...p}>
+    <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+    <circle cx="9.5" cy="10.5" r="2.3" />
+    <path d="M5.8 16.3a3.9 3.9 0 0 1 7.4 0" />
+    <path d="M15.5 9.5h3M15.5 13h3" />
+  </Svg>
+)
+
 /** Relógio: quem está esperando resposta. */
 export const IconeRelogio = (p: Props) => (
   <Svg {...p}>

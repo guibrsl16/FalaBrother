@@ -96,6 +96,9 @@
   --amarelo: #f5b25f;
   --amarelo-rgb: 245, 178, 95;
   --amarelo-fundo: rgba(245, 178, 95, 0.14);
+  --laranja: #ff9d5c;
+  --laranja-rgb: 255, 157, 92;
+  --laranja-fundo: rgba(255, 157, 92, 0.14);
   --azul: #7ed4f5;
   --azul-rgb: 126, 212, 245;
   --azul-fundo: rgba(126, 212, 245, 0.14);
@@ -176,6 +179,9 @@
   --amarelo: #a2660a;
   --amarelo-rgb: 162, 102, 10;
   --amarelo-fundo: rgba(162, 102, 10, 0.12);
+  --laranja: #c2630f;
+  --laranja-rgb: 194, 99, 15;
+  --laranja-fundo: rgba(194, 99, 15, 0.12);
   --azul: #0b6e8f;
   --azul-rgb: 11, 110, 143;
   --azul-fundo: rgba(11, 110, 143, 0.1);
@@ -1029,6 +1035,11 @@ button.etiqueta {
   background: var(--azul-fundo);
   color: var(--azul);
   border-color: rgba(var(--azul-rgb), 0.3);
+}
+.etiqueta.laranja {
+  background: var(--laranja-fundo);
+  color: var(--laranja);
+  border-color: rgba(var(--laranja-rgb), 0.3);
 }
 .etiqueta.roxa {
   background: var(--roxo-fundo);
