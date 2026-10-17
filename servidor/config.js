@@ -46,6 +46,15 @@ export const PASTA_DADOS = process.env.PASTA_DADOS
   ? path.resolve(process.env.PASTA_DADOS)
   : path.join(RAIZ, 'dados')
 
+/**
+ * Banco de dados (Postgres/Supabase) onde ficam usuários, conversas, cursos
+ * etc. Vazio = volta para os arquivos JSON em PASTA_DADOS (modo antigo). As
+ * credenciais do WhatsApp (Baileys) e o cache de mídia continuam sempre em
+ * disco — a biblioteca exige pasta, e não é dado de negócio, é a chave da
+ * conexão com o aparelho.
+ */
+export const DATABASE_URL = process.env.DATABASE_URL || ''
+
 export const env = {
   porta: Number(process.env.PORTA || 8787),
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',

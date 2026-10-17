@@ -15,10 +15,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import pg from 'pg'
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const arquivoUsuarios = path.join(raiz, 'dados', 'usuarios.json')
 const arquivoSessoes = path.join(raiz, 'dados', 'sessoes.json')
+
+// Mesma regra do servidor (config.js): vazio = arquivo, preenchido = Postgres.
+const DATABASE_URL = process.env.DATABASE_URL || ''
 
 function sair(mensagem) {
   console.error(`\n  ${mensagem}\n`)
@@ -36,9 +40,6 @@ const email = String(process.argv[2] || '').trim().toLowerCase()
 if (!email) {
   sair('Diga de quem é o e-mail:  npm run redefinir-2fa -- pessoa@escola.com.br')
 }
-if (!fs.existsSync(arquivoUsuarios)) {
-  sair('Não achei dados/usuarios.json — ainda não há ninguém cadastrado.')
-}
 
 // Com o sistema no ar, ele regrava a própria cópia da memória por cima do que
 // fizermos aqui. Melhor recusar do que fingir que deu certo.
@@ -51,7 +52,43 @@ try {
   rodando = false
 }
 if (rodando) {
-  sair(`O sistema está no ar (porta ${porta}). Pare-o com Ctrl+C na janela do "npm start" e rode este comando de novo.`)
+  sair(`O sistema está no ar (porta ${porta}). Pare-o e rode este comando de novo.`)
+}
+
+if (DATABASE_URL) {
+  const pool = new pg.Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } })
+  const { rows } = await pool.query("select valor from colecoes where nome = 'usuarios'")
+  const usuarios = rows[0]?.valor || []
+  const alvo = usuarios.find((u) => u.email === email)
+  if (!alvo) {
+    await pool.end()
+    sair(`Ninguém cadastrado com o e-mail ${email}. Cadastrados: ${usuarios.map((u) => u.email).join(', ') || '(ninguém)'}`)
+  }
+
+  delete alvo.totp
+  delete alvo.totpPendente
+  delete alvo.recuperacao
+  await pool.query(
+    "insert into colecoes (nome, valor, atualizado_em) values ('usuarios', $1, now()) " +
+      'on conflict (nome) do update set valor = $1, atualizado_em = now()',
+    [JSON.stringify(usuarios)],
+  )
+
+  const { rows: sessoesRows } = await pool.query("select valor from colecoes where nome = 'sessoes'")
+  const sessoes = sessoesRows[0]?.valor || []
+  await pool.query(
+    "insert into colecoes (nome, valor, atualizado_em) values ('sessoes', $1, now()) " +
+      'on conflict (nome) do update set valor = $1, atualizado_em = now()',
+    [JSON.stringify(sessoes.filter((s) => s.usuarioId !== alvo.id))],
+  )
+  await pool.end()
+
+  console.log(`\n  Pronto. ${alvo.nome} (${alvo.email}) vai parear o celular de novo no próximo login.\n`)
+  process.exit(0)
+}
+
+if (!fs.existsSync(arquivoUsuarios)) {
+  sair('Não achei dados/usuarios.json — ainda não há ninguém cadastrado.')
 }
 
 const usuarios = JSON.parse(fs.readFileSync(arquivoUsuarios, 'utf8'))

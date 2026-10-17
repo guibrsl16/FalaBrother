@@ -1,30 +1,62 @@
 /**
- * Guarda tudo em arquivos JSON dentro da pasta `dados/`.
+ * Guarda os dados do sistema — usuários, conversas, mensagens, cursos,
+ * agentes, ajustes.
  *
- * Por que não um banco: o atendimento precisa subir com um `npm start` em
- * qualquer computador, sem instalar servidor de banco nem compilar módulo
- * nativo. O volume aqui é conversa de WhatsApp de uma escola — cabe.
+ * Dois jeitos de guardar, escolhidos pela variável DATABASE_URL:
  *
- * Duas decisões que evitam dor de cabeça mais tarde:
- *  - as mensagens de cada conversa ficam em um arquivo próprio
- *    (dados/conversas/<id>.json). O índice geral guarda só o resumo de cada
- *    conversa, então abrir a lista não carrega o histórico inteiro.
- *  - toda gravação é atômica: escreve em .tmp e renomeia. Se faltar luz no
- *    meio, o arquivo antigo continua íntegro.
+ *  - Vazia (padrão): arquivos JSON dentro de `dados/`. É o que faz o
+ *    atendimento subir com um `npm start` em qualquer computador, sem
+ *    instalar servidor de banco. Cada gravação é atômica: escreve em .tmp e
+ *    renomeia — se faltar luz no meio, o arquivo antigo continua íntegro.
+ *
+ *  - Preenchida: um banco Postgres (ex.: Supabase). Os dados não ficam mais
+ *    em arquivo nenhum na máquina que roda o sistema — útil para quem não
+ *    quer depender do disco da VPS.
+ *
+ * Em ambos os casos, o resto do sistema não percebe diferença: fala só com
+ * as funções exportadas aqui (obter, definir, mensagensDe…), nunca com
+ * arquivo ou SQL diretamente. Por dentro, os dois jeitos mantêm tudo numa
+ * cópia em memória (`memoria`, `cacheMensagens`) e gravam no destino de
+ * forma adiada (rajada de mudanças = uma escrita só, ~400ms depois).
+ *
+ * O que NÃO passa por aqui, mesmo com banco configurado: as credenciais de
+ * cada número de WhatsApp (pasta `dados/conexoes/<id>/`) e o cache de mídia.
+ * Isso continua sempre em disco — a biblioteca do WhatsApp (Baileys) exige
+ * uma pasta, e não é dado de negócio, é a chave técnica da conexão com o
+ * aparelho (ver conexoes.js).
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { PASTA_DADOS } from './config.js'
+import pg from 'pg'
+import { PASTA_DADOS, DATABASE_URL } from './config.js'
+
+const USANDO_BANCO = Boolean(DATABASE_URL)
 
 const PASTA_CONVERSAS = path.join(PASTA_DADOS, 'conversas')
+if (!USANDO_BANCO) fs.mkdirSync(PASTA_CONVERSAS, { recursive: true })
 
-fs.mkdirSync(PASTA_CONVERSAS, { recursive: true })
+const pool = USANDO_BANCO ? new pg.Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } }) : null
+
+const ESQUEMA = `
+  create table if not exists colecoes (
+    nome text primary key,
+    valor jsonb not null,
+    atualizado_em timestamptz not null default now()
+  );
+  create table if not exists mensagens (
+    conversa_id text primary key,
+    lista jsonb not null default '[]'::jsonb,
+    atualizado_em timestamptz not null default now()
+  );
+`
+
+/* -------------------------- arquivos (modo antigo) ----------------------- */
 
 function caminho(nome) {
   return path.join(PASTA_DADOS, `${nome}.json`)
 }
 
-function ler(nome, padrao) {
+function lerArquivo(nome, padrao) {
   const arquivo = caminho(nome)
   if (!fs.existsSync(arquivo)) return padrao
   try {
@@ -41,25 +73,64 @@ function ler(nome, padrao) {
   }
 }
 
-function gravar(arquivo, valor) {
+function gravarArquivo(arquivo, valor) {
   const temporario = `${arquivo}.tmp`
   fs.writeFileSync(temporario, JSON.stringify(valor, null, 2), 'utf8')
   fs.renameSync(temporario, arquivo)
 }
 
+function arquivoMensagens(conversaId) {
+  return path.join(PASTA_CONVERSAS, `${conversaId}.json`)
+}
+
 /* ------------------------------------------------------------------ */
-/* Estado em memória — o disco é só a cópia durável                    */
+/* Estado em memória — o disco/banco é só a cópia durável              */
 /* ------------------------------------------------------------------ */
 
-/** As coleções simples: um arquivo JSON para cada uma. */
+/** As coleções simples: um registro para cada uma (arquivo, ou linha da tabela `colecoes`). */
 const COLECOES = ['ajustes', 'cursos', 'agentes', 'conversas', 'usuarios', 'sessoes', 'conexoes']
 
-const memoria = Object.fromEntries(COLECOES.map((nome) => [nome, ler(nome, null)]))
+const memoria = {}
+const cacheMensagens = new Map()
+
+/**
+ * Carrega tudo na memória. Precisa terminar (e ser esperada, com `await`)
+ * antes do resto do sistema começar a ler ou gravar qualquer coisa — é por
+ * isso que o index.js chama isto antes de importar os módulos que usam
+ * `obter`/`definir` assim que sobem.
+ */
+export async function carregar() {
+  if (!USANDO_BANCO) {
+    for (const nome of COLECOES) memoria[nome] = lerArquivo(nome, null)
+    return
+  }
+
+  await pool.query(ESQUEMA)
+
+  const { rows } = await pool.query('select nome, valor from colecoes')
+  const porNome = new Map(rows.map((r) => [r.nome, r.valor]))
+  for (const nome of COLECOES) memoria[nome] = porNome.has(nome) ? porNome.get(nome) : null
+
+  const { rows: msgRows } = await pool.query('select conversa_id, lista from mensagens')
+  for (const row of msgRows) cacheMensagens.set(row.conversa_id, row.lista)
+}
 
 const gravacaoPendente = new Set()
 let timerGravacao = null
 
-/** Agenda a gravação para daqui a pouco: rajada de mensagens = uma escrita. */
+async function gravarColecao(nome) {
+  if (!USANDO_BANCO) {
+    gravarArquivo(caminho(nome), memoria[nome])
+    return
+  }
+  await pool.query(
+    'insert into colecoes (nome, valor, atualizado_em) values ($1, $2, now()) ' +
+      'on conflict (nome) do update set valor = $2, atualizado_em = now()',
+    [nome, JSON.stringify(memoria[nome])],
+  )
+}
+
+/** Agenda a gravação para daqui a pouco: rajada de mudanças = uma escrita. */
 function agendar(nome) {
   gravacaoPendente.add(nome)
   if (timerGravacao) return
@@ -68,17 +139,13 @@ function agendar(nome) {
     const pendentes = [...gravacaoPendente]
     gravacaoPendente.clear()
     for (const item of pendentes) {
-      try {
-        gravar(caminho(item), memoria[item])
-      } catch (erro) {
-        console.error(`[dados] falha ao gravar ${item}:`, erro.message)
-      }
+      gravarColecao(item).catch((erro) => console.error(`[dados] falha ao gravar ${item}:`, erro.message))
     }
   }, 400)
 }
 
-/** Grava agora, sem esperar. Usado ao encerrar o programa. */
-export function gravarTudo() {
+/** Grava agora, sem esperar o adiamento. Usado ao encerrar o programa. */
+export async function gravarTudo() {
   if (timerGravacao) {
     clearTimeout(timerGravacao)
     timerGravacao = null
@@ -87,7 +154,7 @@ export function gravarTudo() {
   for (const nome of COLECOES) {
     if (memoria[nome] == null) continue
     try {
-      gravar(caminho(nome), memoria[nome])
+      await gravarColecao(nome)
     } catch (erro) {
       console.error(`[dados] falha ao gravar ${nome}:`, erro.message)
     }
@@ -113,38 +180,19 @@ export function vazio() {
 
 /* -------------------------- mensagens ----------------------------- */
 
-const cacheMensagens = new Map()
-
-/**
- * Quantas conversas ficam com o histórico na memória. Depois de uma
- * sincronização o sistema pode ter milhares de conversas; só as mais
- * recentes precisam estar à mão — as outras voltam do disco quando alguém abre.
- */
-const LIMITE_CACHE_MENSAGENS = 300
-
-function aparar() {
-  if (cacheMensagens.size <= LIMITE_CACHE_MENSAGENS) return
-  for (const chave of cacheMensagens.keys()) {
-    if (cacheMensagens.size <= LIMITE_CACHE_MENSAGENS) break
-    // o que ainda não foi gravado fica: apagar da memória seria perder a mensagem
-    if (!conversasSujas.has(chave)) cacheMensagens.delete(chave)
-  }
-}
-
-function arquivoMensagens(conversaId) {
-  return path.join(PASTA_CONVERSAS, `${conversaId}.json`)
-}
-
 export function mensagensDe(conversaId) {
   if (cacheMensagens.has(conversaId)) return cacheMensagens.get(conversaId)
-  const arquivo = arquivoMensagens(conversaId)
+  // modo arquivo: nem toda conversa está pré-carregada (só o que já foi pedido)
   let lista = []
-  if (fs.existsSync(arquivo)) {
-    try {
-      lista = JSON.parse(fs.readFileSync(arquivo, 'utf8'))
-    } catch (erro) {
-      console.error(`[dados] histórico de ${conversaId} ilegível:`, erro.message)
-      lista = []
+  if (!USANDO_BANCO) {
+    const arquivo = arquivoMensagens(conversaId)
+    if (fs.existsSync(arquivo)) {
+      try {
+        lista = JSON.parse(fs.readFileSync(arquivo, 'utf8'))
+      } catch (erro) {
+        console.error(`[dados] histórico de ${conversaId} ilegível:`, erro.message)
+        lista = []
+      }
     }
   }
   cacheMensagens.set(conversaId, lista)
@@ -154,13 +202,28 @@ export function mensagensDe(conversaId) {
 const conversasSujas = new Set()
 let timerMensagens = null
 
+async function gravarMensagensDe(conversaId) {
+  const lista = cacheMensagens.get(conversaId) || []
+  if (!USANDO_BANCO) {
+    gravarArquivo(arquivoMensagens(conversaId), lista)
+    return
+  }
+  await pool.query(
+    'insert into mensagens (conversa_id, lista, atualizado_em) values ($1, $2, now()) ' +
+      'on conflict (conversa_id) do update set lista = $2, atualizado_em = now()',
+    [conversaId, JSON.stringify(lista)],
+  )
+}
+
+function agendarMensagens() {
+  if (!timerMensagens) timerMensagens = setTimeout(descarregarMensagens, 400)
+}
+
 export function guardarMensagem(conversaId, mensagem) {
   const lista = mensagensDe(conversaId)
   lista.push(mensagem)
   conversasSujas.add(conversaId)
-  if (!timerMensagens) {
-    timerMensagens = setTimeout(descarregarMensagens, 400)
-  }
+  agendarMensagens()
   return mensagem
 }
 
@@ -177,7 +240,7 @@ export function guardarVarias(conversaId, novas, limite = 1000) {
   lista.sort((a, b) => (a.em < b.em ? -1 : a.em > b.em ? 1 : 0))
   if (lista.length > limite) lista.splice(0, lista.length - limite)
   conversasSujas.add(conversaId)
-  if (!timerMensagens) timerMensagens = setTimeout(descarregarMensagens, 400)
+  agendarMensagens()
   return lista
 }
 
@@ -187,7 +250,7 @@ export function atualizarMensagem(conversaId, mensagemId, mudancas) {
   if (!alvo) return null
   Object.assign(alvo, mudancas)
   conversasSujas.add(conversaId)
-  if (!timerMensagens) timerMensagens = setTimeout(descarregarMensagens, 400)
+  agendarMensagens()
   return alvo
 }
 
@@ -196,24 +259,25 @@ function descarregarMensagens() {
   const pendentes = [...conversasSujas]
   conversasSujas.clear()
   for (const conversaId of pendentes) {
-    try {
-      gravar(arquivoMensagens(conversaId), cacheMensagens.get(conversaId) || [])
-    } catch (erro) {
-      console.error(`[dados] falha ao gravar histórico de ${conversaId}:`, erro.message)
-    }
+    gravarMensagensDe(conversaId).catch((erro) =>
+      console.error(`[dados] falha ao gravar histórico de ${conversaId}:`, erro.message),
+    )
   }
-  aparar()
 }
 
-export function apagarMensagens(conversaId) {
+export async function apagarMensagens(conversaId) {
   cacheMensagens.delete(conversaId)
   conversasSujas.delete(conversaId)
-  const arquivo = arquivoMensagens(conversaId)
-  if (fs.existsSync(arquivo)) fs.unlinkSync(arquivo)
+  if (!USANDO_BANCO) {
+    const arquivo = arquivoMensagens(conversaId)
+    if (fs.existsSync(arquivo)) fs.unlinkSync(arquivo)
+    return
+  }
+  await pool.query('delete from mensagens where conversa_id = $1', [conversaId])
 }
 
 /** Grava histórico pendente. Chamado junto com gravarTudo(). */
-export function descarregarAgora() {
+export async function descarregarAgora() {
   if (timerMensagens) {
     clearTimeout(timerMensagens)
     timerMensagens = null
@@ -222,7 +286,7 @@ export function descarregarAgora() {
   conversasSujas.clear()
   for (const conversaId of pendentes) {
     try {
-      gravar(arquivoMensagens(conversaId), cacheMensagens.get(conversaId) || [])
+      await gravarMensagensDe(conversaId)
     } catch (erro) {
       console.error(`[dados] falha ao gravar histórico de ${conversaId}:`, erro.message)
     }

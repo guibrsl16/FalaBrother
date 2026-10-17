@@ -653,7 +653,7 @@ export function indicadores() {
 /* Encerramento limpo                                                  */
 /* ------------------------------------------------------------------ */
 
-export function fechar() {
-  banco.gravarTudo()
-  banco.descarregarAgora()
+export async function fechar() {
+  await banco.gravarTudo()
+  await banco.descarregarAgora()
 }

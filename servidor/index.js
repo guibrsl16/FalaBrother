@@ -11,12 +11,20 @@ import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import { env, RAIZ } from './config.js'
-import * as estado from './estado.js'
-import * as whatsapp from './whatsapp.js'
-import * as atendimento from './atendimento.js'
-import * as acesso from './acesso.js'
-import * as conexoes from './conexoes.js'
-import { rotas } from './rotas.js'
+import * as armazenamento from './armazenamento.js'
+
+// Carrega tudo na memória (arquivo ou banco, conforme DATABASE_URL) antes de
+// importar os módulos abaixo: eles leem dados já na primeira linha, assim
+// que sobem, e não dá para fazer essa leitura sem esperar quando é um banco
+// de verdade do outro lado da rede.
+await armazenamento.carregar()
+
+const estado = await import('./estado.js')
+const whatsapp = await import('./whatsapp.js')
+const atendimento = await import('./atendimento.js')
+const acesso = await import('./acesso.js')
+const conexoes = await import('./conexoes.js')
+const { rotas } = await import('./rotas.js')
 
 const app = express()
 app.disable('x-powered-by')
@@ -138,19 +146,25 @@ const servidor = app.listen(env.porta, () => {
   conexoes.retomarTodas().catch((erro) => console.error('[conexões] falha ao religar os números:', erro))
 })
 
-function encerrar() {
+async function encerrar() {
   console.log('\n  gravando e saindo…')
   conexoes.encerrarTodas()
-  estado.fechar()
+  await estado.fechar().catch((erro) => console.error('[servidor] falha ao gravar antes de sair:', erro))
   servidor.close(() => process.exit(0))
-  setTimeout(() => process.exit(0), 1500).unref()
 }
 
-process.on('SIGINT', encerrar)
-process.on('SIGTERM', encerrar)
+// prazo máximo para a gravação final — se o banco não responder, sai assim mesmo
+process.on('SIGINT', () => {
+  encerrar()
+  setTimeout(() => process.exit(0), 3000).unref()
+})
+process.on('SIGTERM', () => {
+  encerrar()
+  setTimeout(() => process.exit(0), 3000).unref()
+})
 process.on('uncaughtException', (erro) => {
   console.error('[servidor] erro não tratado:', erro)
-  estado.fechar()
+  estado.fechar().catch(() => {})
 })
 // uma conexão de WhatsApp que falha em segundo plano não pode derrubar o atendimento inteiro
 process.on('unhandledRejection', (motivo) => {
