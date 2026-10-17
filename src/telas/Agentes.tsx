@@ -252,7 +252,7 @@ function EditorDeAgente({ agente, aoFechar }: { agente: Agente; aoFechar: () => 
     >
       {/* identificação */}
       <div className="grade g2">
-        <Campo rotulo="Nome">
+        <Campo rotulo="Nome" dica="Aparece só para a equipe, não para o cliente.">
           <input value={rascunho.nome} onChange={(e) => mexer({ nome: e.target.value })} />
         </Campo>
         <Campo rotulo="Função" dica="Aparece só para a equipe, não para o cliente.">
@@ -262,6 +262,20 @@ function EditorDeAgente({ agente, aoFechar }: { agente: Agente; aoFechar: () => 
             placeholder="Especialista em Excel Profissional"
           />
         </Campo>
+      </div>
+
+      <div className="grade g2">
+        <Campo
+          rotulo="Nome de quem atende"
+          dica='É com esse nome que o agente se apresenta no WhatsApp ("meu nome é...").'
+        >
+          <input
+            value={rascunho.nomeDoAtendente}
+            onChange={(e) => mexer({ nomeDoAtendente: e.target.value })}
+            placeholder="Amanda"
+          />
+        </Campo>
+        <div />
       </div>
 
       <div className="grade g2">

@@ -27,6 +27,8 @@ export interface PerguntaFrequente {
 export interface Agente {
   id: string
   nome: string
+  /** Nome de pessoa que o agente usa para se apresentar no WhatsApp. Ex.: "Amanda". */
+  nomeDoAtendente: string
   papel: string
   cursoId: string | null
   triagem: boolean

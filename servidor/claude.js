@@ -84,6 +84,14 @@ function montarSistema(agente, contexto) {
 
   const doAgente = ['=== SEU PAPEL ===', agente.instrucoes || '']
 
+  if (agente.nomeDoAtendente) {
+    doAgente.push(
+      '',
+      '=== SEU NOME ===',
+      `Nesta conversa você se chama ${agente.nomeDoAtendente}. Apresente-se assim seguindo o item 3 de "COMO ABRIR A CONVERSA".`,
+    )
+  }
+
   const meuCurso = agente.cursoId ? buscarCurso(agente.cursoId) : null
   if (meuCurso) {
     doAgente.push('', '=== O CURSO QUE VOCÊ REPRESENTA ===', fichaDoCurso(meuCurso))

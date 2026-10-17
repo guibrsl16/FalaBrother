@@ -187,6 +187,7 @@ export function salvarAgente(dados) {
   const novo = {
     id: dados.id || id('agente-'),
     nome: 'Novo agente',
+    nomeDoAtendente: '',
     papel: '',
     cursoId: null,
     triagem: false,
