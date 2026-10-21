@@ -989,6 +989,22 @@ select {
   font-weight: 650;
 }
 
+.opcoes.compacta {
+  padding: 2px;
+}
+
+.opcoes.compacta button {
+  height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.audio-mensagem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
 /* ---------------------------------------------------------------- */
 /* Etiquetas                                                         */
 /* ---------------------------------------------------------------- */

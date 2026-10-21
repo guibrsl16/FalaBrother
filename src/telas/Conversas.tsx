@@ -6,7 +6,7 @@
  * para na hora e só volta quando alguém devolver — porque nada é pior num
  * atendimento do que o robô responder por cima do humano.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLoja } from '../estado'
 import { api } from '../api'
 import {
@@ -266,13 +266,26 @@ function corDoEstado(estado: EstadoConversa) {
 /* A conversa aberta                                                   */
 /* ------------------------------------------------------------------ */
 
-function Conversa({ conversa, digitando }: { conversa: Conversa; digitando: boolean }) {
+/**
+ * Memoizada: sem isso, qualquer novidade em tempo real em OUTRA conversa —
+ * mensagem de outro cliente, agenda de agentes, etc. — reconstruía esta tela
+ * inteira e, no meio do caminho, cortava um áudio que estivesse tocando.
+ * Com React.memo, só re-renderiza quando a própria conversa aberta muda.
+ */
+const Conversa = React.memo(function Conversa({
+  conversa,
+  digitando,
+}: {
+  conversa: Conversa
+  digitando: boolean
+}) {
   const loja = useLoja()
   const { mensagens, carregando } = loja.usarMensagens(conversa.id)
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [gravando, setGravando] = useState(false)
   const fim = useRef<HTMLDivElement>(null)
+  const painelMensagens = useRef<HTMLDivElement>(null)
 
   const agente = loja.agentes.find((a) => a.id === conversa.agenteId)
   const conexao = conversa.conexaoId ? loja.conexoes.find((c) => c.id === conversa.conexaoId) : null
@@ -288,8 +301,13 @@ function Conversa({ conversa, digitando }: { conversa: Conversa; digitando: bool
       ? null
       : 'Esta conversa não está ligada a um número conectado — o que você escrever não será enviado.'
 
+  // Rola para a mensagem mais nova sozinho só se a pessoa já estava perto do
+  // fim — senão, alguém ouvindo um áudio mais acima (ou lendo o histórico)
+  // seria arrastado para baixo a cada mensagem nova, em qualquer conversa.
   useEffect(() => {
-    fim.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    const painel = painelMensagens.current
+    const pertoDoFim = !painel || painel.scrollHeight - painel.scrollTop - painel.clientHeight < 140
+    if (pertoDoFim) fim.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [mensagens.length, digitando])
 
   async function enviar() {
@@ -406,7 +424,7 @@ function Conversa({ conversa, digitando }: { conversa: Conversa; digitando: bool
         </div>
       </header>
 
-      <div className="mensagens">
+      <div className="mensagens" ref={painelMensagens}>
         {carregando && (
           <div style={{ textAlign: 'center', color: 'var(--txt-3)', fontSize: 12.5, padding: 20 }}>
             carregando o histórico…
@@ -492,7 +510,7 @@ function Conversa({ conversa, digitando }: { conversa: Conversa; digitando: bool
       </div>
     </section>
   )
-}
+})
 
 function blobParaBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -630,7 +648,19 @@ function BotaoBuscarAntigas({ conversaId }: { conversaId: string }) {
   )
 }
 
-function Balao({ mensagem, nomeAgente }: { mensagem: Mensagem; nomeAgente?: string }) {
+/**
+ * Memoizada pelo mesmo motivo da conversa: uma mensagem que só teve o status
+ * atualizado (entregue → lida) trocava de objeto e reconstruía o balão —
+ * incluindo o áudio, se fosse o caso. Com React.memo, balões de mensagens que
+ * não mudaram nem chegam a re-renderizar.
+ */
+const Balao = React.memo(function Balao({
+  mensagem,
+  nomeAgente,
+}: {
+  mensagem: Mensagem
+  nomeAgente?: string
+}) {
   if (mensagem.de === 'sistema') {
     const classe =
       mensagem.tipo === 'erro' ? 'erro' : mensagem.tipo === 'transferencia' ? 'transferencia' : ''
@@ -672,7 +702,7 @@ function Balao({ mensagem, nomeAgente }: { mensagem: Mensagem; nomeAgente?: stri
       </div>
     </div>
   )
-}
+})
 
 /**
  * A legenda que vale a pena mostrar de novo embaixo da mídia: se a pessoa
@@ -689,8 +719,9 @@ function legendaVisivel(texto: string, tipo: string) {
  * guardados pelo servidor. Se o arquivo não existir (ainda baixando, ou a
  * tentativa falhou), cai para a descrição em texto sozinho, sem erro visível.
  */
-function Anexo({ mensagem }: { mensagem: Mensagem }) {
+const Anexo = React.memo(function Anexo({ mensagem }: { mensagem: Mensagem }) {
   const [falhou, setFalhou] = useState(false)
+  const aoFalhar = useCallback(() => setFalhou(true), [])
   const anexo = mensagem.anexo
   if (!anexo) return null
   if (falhou) return <>{mensagem.texto}</>
@@ -704,7 +735,7 @@ function Anexo({ mensagem }: { mensagem: Mensagem }) {
         <img
           src={url}
           alt=""
-          onError={() => setFalhou(true)}
+          onError={aoFalhar}
           style={{ display: 'block', maxWidth: '100%', maxHeight: 320, borderRadius: 10, marginBottom: legenda ? 6 : 0 }}
         />
         {legenda}
@@ -713,11 +744,11 @@ function Anexo({ mensagem }: { mensagem: Mensagem }) {
   }
 
   if (anexo.tipo === 'figurinha') {
-    return <img src={url} alt="" onError={() => setFalhou(true)} style={{ display: 'block', width: 128, height: 128 }} />
+    return <img src={url} alt="" onError={aoFalhar} style={{ display: 'block', width: 128, height: 128 }} />
   }
 
   if (anexo.tipo === 'audio') {
-    return <audio controls src={url} onError={() => setFalhou(true)} style={{ display: 'block', width: 240 }} />
+    return <PlayerDeAudio url={url} onError={aoFalhar} />
   }
 
   if (anexo.tipo === 'documento') {
@@ -732,7 +763,62 @@ function Anexo({ mensagem }: { mensagem: Mensagem }) {
   }
 
   return <>{mensagem.texto}</>
-}
+})
+
+const VELOCIDADES_AUDIO = [1, 1.5, 2] as const
+
+/**
+ * O áudio de uma mensagem, com velocidade ajustável (1x / 1,5x / 2x).
+ * Memoizado e dono do próprio `<audio>`: como a `url` de uma mensagem nunca
+ * muda, este componente nunca re-renderiza depois do primeiro desenho — nada
+ * que aconteça em outra conversa (ou nesta, status de outra mensagem) chega
+ * a tocar neste elemento, então ele nunca é cortado nem perde o lugar.
+ */
+const PlayerDeAudio = React.memo(function PlayerDeAudio({
+  url,
+  onError,
+}: {
+  url: string
+  onError: () => void
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const [velocidade, setVelocidade] = useState<number>(1)
+
+  function aplicarVelocidade(v: number) {
+    setVelocidade(v)
+    if (audioRef.current) audioRef.current.playbackRate = v
+  }
+
+  return (
+    <div className="audio-mensagem">
+      <audio
+        ref={audioRef}
+        controls
+        preload="metadata"
+        src={url}
+        onError={onError}
+        // o navegador reseta a velocidade quando o áudio termina de carregar
+        onLoadedMetadata={(e) => {
+          e.currentTarget.playbackRate = velocidade
+        }}
+        style={{ display: 'block', width: 240 }}
+      />
+      <div className="opcoes compacta" style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+        {VELOCIDADES_AUDIO.map((v) => (
+          <button
+            key={v}
+            type="button"
+            className={velocidade === v ? 'ativo' : ''}
+            onClick={() => aplicarVelocidade(v)}
+            title={`Ouvir em ${v}x`}
+          >
+            {v.toFixed(1)}x
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+})
 
 /* ------------------------------------------------------------------ */
 /* Ficha lateral                                                       */
