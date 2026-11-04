@@ -162,7 +162,17 @@ export function atualizarStatus(status) {
 
 function agendarResposta(conversaId) {
   const espera = Math.max(0, Number(estado.ajustes().segundosDeEspera) || 0) * 1000
+  marcarTimer(conversaId, espera)
+}
 
+/** Tenta de novo rápido, sem reiniciar a espera cheia de novo — a pessoa já tinha terminado de escrever. */
+const RETENTATIVA_TRANCADA_MS = 1500
+
+function reagendarEmBreve(conversaId) {
+  marcarTimer(conversaId, RETENTATIVA_TRANCADA_MS)
+}
+
+function marcarTimer(conversaId, atrasoMs) {
   const anterior = timersDeEspera.get(conversaId)
   if (anterior) clearTimeout(anterior)
 
@@ -171,7 +181,7 @@ function agendarResposta(conversaId) {
     responderConversa(conversaId).catch((erro) => {
       console.error('[atendimento] falha ao responder:', erro)
     })
-  }, espera)
+  }, atrasoMs)
 
   timersDeEspera.set(conversaId, timer)
 }
@@ -220,7 +230,14 @@ function escolherAgente(conv, ultimoTexto) {
 /* ------------------------------------------------------------------ */
 
 export async function responderConversa(conversaId) {
-  if (trancadas.has(conversaId)) return
+  // Chegou um pedaço da mensagem enquanto a resposta ao pedaço anterior ainda
+  // estava sendo gerada: não é "não há o que fazer" — é só muito cedo. Tenta
+  // de novo em breve, em vez de descartar (senão esse pedaço fica sem
+  // resposta até a pessoa escrever outra coisa).
+  if (trancadas.has(conversaId)) {
+    reagendarEmBreve(conversaId)
+    return
+  }
   const conv = estado.conversa(conversaId)
   if (!conv) return
 
@@ -303,6 +320,20 @@ export async function responderConversa(conversaId) {
       },
     })
 
+    // Trava no código, não só no prompt: se o agente ia mandar exatamente a
+    // mensagem que ele mesmo já mandou por último nesta conversa, isso é
+    // sinal de loop — passa para um atendente em vez de repetir.
+    const ultimaDoAgente = [...historico].reverse().find((m) => m.de === 'agente')
+    if (resultado.texto && ultimaDoAgente && normalizarParaComparar(ultimaDoAgente.texto) === normalizarParaComparar(resultado.texto)) {
+      resultado.texto = ''
+      if (!resultado.transferir) {
+        resultado.transferir = {
+          motivo: 'outro',
+          resumo: 'O agente ia repetir a última mensagem — passando para um atendente conferir.',
+        }
+      }
+    }
+
     await aplicarAcoes(conv, resultado)
 
     if (resultado.texto) {
@@ -341,6 +372,11 @@ export async function responderConversa(conversaId) {
     publicar('parou-de-digitar', { conversaId })
     if (conv.conexaoId) conexoes.digitando(conv.conexaoId, conv.jid || conv.telefone, false)
   }
+}
+
+/** Ignora espaço e maiúscula/minúscula para comparar se duas mensagens são "a mesma". */
+function normalizarParaComparar(texto) {
+  return (texto || '').toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
 function rotuloMotivo(motivo) {
