@@ -146,6 +146,9 @@ function montarSistema(agente, contexto) {
 
   doAgente.push(
     '',
+    '=== LEMBRETE FINAL, antes de escrever ===',
+    'Releia o que você já mandou nesta conversa: se a pessoa não respondeu à sua última pergunta, não repita a mesma pergunta com outras palavras — siga adiante. Todo número que você disser — preço, parcela, mês, hora, vaga, encontro — tem que estar, exatamente, na ficha do curso desta conversa. Se não estiver lá, não escreva o número: diga que vai confirmar e, se for o caso, chame transferir_para_atendente.',
+    '',
     '=== FERRAMENTAS ===',
     'transferir_para_atendente: use quando a regra acima pedir. Depois de chamá-la, escreva uma última mensagem curta avisando que alguém da equipe vai continuar.',
     'registrar_interesse: use assim que souber o nome da pessoa ou o curso que ela quer. É o que vira lista de contato para a equipe.',
@@ -251,6 +254,37 @@ function ferramentas() {
     },
   ]
 }
+
+/* ------------------------------------------------------------------ */
+/* Guarda contra valor inventado                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Checagem no código, não no prompt: todo número sensível que o agente
+ * escrever — preço, parcelas, meses, horas, vagas, encontros — precisa
+ * aparecer, literalmente, na ficha do curso que ele representa. Pedir ao
+ * modelo para não inventar esses números ajuda, mas não garante nada — isso
+ * garante. Agente sem curso (a Recepção) nunca pode citar número sensível
+ * nenhum, porque não tem ficha própria.
+ */
+const PADRAO_QUANTIDADE_SENSIVEL =
+  /R\$\s*(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s*x\b|(\d+(?:[.,]\d+)?)\s*(?:hora|horas|m[eê]s|meses|pessoa|pessoas|aluno|alunos|vaga|vagas|encontro|encontros|parcela|parcelas)\b/gi
+
+function numerosDaFicha(curso) {
+  if (!curso) return new Set()
+  return new Set((fichaDoCurso(curso).match(/\d+(?:[.,]\d+)?/g) || []).map((n) => n.replace(',', '.')))
+}
+
+function valorForaDoCatalogo(texto, agenteAtual) {
+  const permitidos = numerosDaFicha(agenteAtual.cursoId ? buscarCurso(agenteAtual.cursoId) : null)
+  for (const m of texto.matchAll(PADRAO_QUANTIDADE_SENSIVEL)) {
+    const numero = (m[1] || m[2] || m[3]).replace(',', '.')
+    if (!permitidos.has(numero)) return true
+  }
+  return false
+}
+
+const AVISO_VALOR_INVENTADO = 'Deixa eu confirmar esse número certinho com a equipe antes de te passar — só um instante.'
 
 /* ------------------------------------------------------------------ */
 /* Conversa → mensagens da API                                         */
@@ -382,6 +416,18 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
     const chamadas = resposta.content.filter((b) => b.type === 'tool_use')
 
     if (!chamadas.length) {
+      if (texto && valorForaDoCatalogo(texto, agenteAtual)) {
+        return {
+          texto: AVISO_VALOR_INVENTADO,
+          transferir: {
+            motivo: 'fora_do_catalogo',
+            resumo: 'O agente ia citar um valor que não está na ficha do curso — passando para confirmar com a equipe.',
+          },
+          acoes,
+          uso,
+          agenteId: agenteAtual.id,
+        }
+      }
       return { texto, transferir: null, acoes, uso, agenteId: agenteAtual.id }
     }
 
@@ -481,13 +527,17 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
       })
       uso.entrada += despedida.usage?.input_tokens || 0
       uso.saida += despedida.usage?.output_tokens || 0
-      const textoFinal = despedida.content
+      let textoFinal = despedida.content
         .filter((b) => b.type === 'text')
         .map((b) => b.text)
         .join('\n')
         .trim()
+      textoFinal = textoFinal || texto
+      if (textoFinal && valorForaDoCatalogo(textoFinal, agenteAtual)) {
+        textoFinal = AVISO_VALOR_INVENTADO
+      }
       return {
-        texto: textoFinal || texto,
+        texto: textoFinal,
         transferir,
         acoes,
         uso,
