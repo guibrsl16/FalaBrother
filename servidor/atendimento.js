@@ -24,6 +24,13 @@ const timersDeEspera = new Map()
 const trancadas = new Set()
 const avisoForaDoHorario = new Map()
 
+/** Pausa entre um balão e outro, quando o agente divide a resposta em mais de uma mensagem. */
+const PAUSA_ENTRE_BALOES_MS = 1200
+
+function esperarMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /* ------------------------------------------------------------------ */
 /* Entrada                                                             */
 /* ------------------------------------------------------------------ */
@@ -342,10 +349,25 @@ export async function responderConversa(conversaId) {
 
     // Trava no código, não só no prompt: se o agente ia mandar exatamente a
     // mensagem que ele mesmo já mandou por último nesta conversa, isso é
-    // sinal de loop — passa para um atendente em vez de repetir.
-    const ultimaDoAgente = [...historico].reverse().find((m) => m.de === 'agente')
-    if (resultado.texto && ultimaDoAgente && normalizarParaComparar(ultimaDoAgente.texto) === normalizarParaComparar(resultado.texto)) {
+    // sinal de loop — passa para um atendente em vez de repetir. O último
+    // "turno" do agente pode ter saído em vários balões (ver dividirEmBaloes
+    // em claude.js); junta todos eles, na ordem, para comparar com a
+    // resposta nova inteira — não só com o balão final.
+    let fimDoUltimoTurno = -1
+    for (let i = historico.length - 1; i >= 0; i -= 1) {
+      if (historico[i].de === 'agente') {
+        fimDoUltimoTurno = i
+        break
+      }
+    }
+    const ultimoTurnoDoAgente = []
+    for (let i = fimDoUltimoTurno; i >= 0 && historico[i].de === 'agente'; i -= 1) {
+      ultimoTurnoDoAgente.unshift(historico[i].texto)
+    }
+    const textoDoUltimoTurno = ultimoTurnoDoAgente.join('\n\n')
+    if (resultado.texto && textoDoUltimoTurno && normalizarParaComparar(textoDoUltimoTurno) === normalizarParaComparar(resultado.texto)) {
       resultado.texto = ''
+      resultado.partes = []
       if (!resultado.transferir) {
         resultado.transferir = {
           motivo: 'outro',
@@ -356,11 +378,18 @@ export async function responderConversa(conversaId) {
 
     await aplicarAcoes(conv, resultado)
 
-    if (resultado.texto) {
-      await enviar(conv, resultado.texto, {
+    // o agente pode dividir a resposta em vários balões (ver dividirEmBaloes
+    // em claude.js) — manda um atrás do outro, com uma pausa curta entre
+    // eles, igual alguém digitando em sequência. O custo da chamada (uso)
+    // vai só no primeiro balão, para não contar o mesmo gasto várias vezes
+    // nos indicadores.
+    const baloes = resultado.partes?.length ? resultado.partes : resultado.texto ? [resultado.texto] : []
+    for (let i = 0; i < baloes.length; i += 1) {
+      if (i > 0) await esperarMs(PAUSA_ENTRE_BALOES_MS)
+      await enviar(conv, baloes[i], {
         de: 'agente',
         agenteId: resultado.agenteId || agente.id,
-        uso: resultado.uso,
+        uso: i === 0 ? resultado.uso : null,
       })
     }
 

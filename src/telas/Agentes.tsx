@@ -545,8 +545,9 @@ function BancoDeProvas({ agente }: { agente: Agente }) {
     try {
       const resultado = await api.testarAgente(agente.id, novo)
       setUltimo(resultado)
-      if (resultado.texto) {
-        setHistorico([...novo, { de: 'agente', texto: resultado.texto }])
+      const baloes = resultado.partes?.length ? resultado.partes : resultado.texto ? [resultado.texto] : []
+      if (baloes.length) {
+        setHistorico([...novo, ...baloes.map((texto) => ({ de: 'agente', texto }))])
       }
     } catch (erro) {
       loja.avisar(erro instanceof Error ? erro.message : 'O teste falhou.', 'erro')

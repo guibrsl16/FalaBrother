@@ -287,6 +287,27 @@ function valorForaDoCatalogo(texto, agenteAtual) {
 const AVISO_VALOR_INVENTADO = 'Deixa eu confirmar esse número certinho com a equipe antes de te passar — só um instante.'
 
 /* ------------------------------------------------------------------ */
+/* Resposta em vários balões                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * O prompt pede mensagens curtas, no estilo WhatsApp. Quando uma resposta
+ * não cabe em poucas linhas, o agente não deve prometer "te conto depois" —
+ * não existe um próximo turno automático, só quando a pessoa escrever de
+ * novo. Em vez disso, ele escreve a resposta inteira já nesta mensagem,
+ * dividida em partes por uma linha só com ">>>", e cada parte vira uma
+ * mensagem de WhatsApp própria, mandada em sequência (ver atendimento.js).
+ */
+const SEPARADOR_DE_BALAO = /^[ \t]*>{3,}[ \t]*$/m
+
+function dividirEmBaloes(texto) {
+  return (texto || '')
+    .split(SEPARADOR_DE_BALAO)
+    .map((parte) => parte.trim())
+    .filter(Boolean)
+}
+
+/* ------------------------------------------------------------------ */
 /* Conversa → mensagens da API                                         */
 /* ------------------------------------------------------------------ */
 
@@ -396,6 +417,7 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
     if (resposta.stop_reason === 'refusal') {
       return {
         texto: '',
+        partes: [],
         recusa: resposta.stop_details?.explanation || 'A resposta foi recusada por segurança.',
         transferir: {
           motivo: 'outro',
@@ -419,6 +441,7 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
       if (texto && valorForaDoCatalogo(texto, agenteAtual)) {
         return {
           texto: AVISO_VALOR_INVENTADO,
+          partes: [AVISO_VALOR_INVENTADO],
           transferir: {
             motivo: 'fora_do_catalogo',
             resumo: 'O agente ia citar um valor que não está na ficha do curso — passando para confirmar com a equipe.',
@@ -428,7 +451,15 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
           agenteId: agenteAtual.id,
         }
       }
-      return { texto, transferir: null, acoes, uso, agenteId: agenteAtual.id }
+      const partes = dividirEmBaloes(texto)
+      return {
+        texto: partes.length ? partes.join('\n\n') : texto,
+        partes: partes.length ? partes : texto ? [texto] : [],
+        transferir: null,
+        acoes,
+        uso,
+        agenteId: agenteAtual.id,
+      }
     }
 
     // devolve a fala do assistente inteira (texto + chamadas) para o histórico
@@ -536,8 +567,10 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
       if (textoFinal && valorForaDoCatalogo(textoFinal, agenteAtual)) {
         textoFinal = AVISO_VALOR_INVENTADO
       }
+      const partesFinal = dividirEmBaloes(textoFinal)
       return {
-        texto: textoFinal,
+        texto: partesFinal.length ? partesFinal.join('\n\n') : textoFinal,
+        partes: partesFinal.length ? partesFinal : textoFinal ? [textoFinal] : [],
         transferir,
         acoes,
         uso,
@@ -548,6 +581,7 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
 
   return {
     texto: '',
+    partes: [],
     transferir: {
       motivo: 'outro',
       resumo: 'O agente ficou dando voltas sem concluir. Vale um olhar humano.',

@@ -242,6 +242,8 @@ export interface Pareamento {
 
 export interface ResultadoTeste {
   texto: string
+  /** A mesma resposta, dividida nas mensagens que seriam mandadas em sequência no WhatsApp. */
+  partes?: string[]
   recusa?: string
   transferir: { motivo: string; resumo: string } | null
   acoes: { tipo: string; [k: string]: unknown }[]
