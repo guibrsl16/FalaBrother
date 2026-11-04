@@ -225,6 +225,23 @@ function escolherAgente(conv, ultimoTexto) {
   return estado.agenteDeTriagem()
 }
 
+/**
+ * Tira do histórico as respostas que ESTE agente deu antes da última vez que
+ * ele foi editado (campo `atualizadoEm`, atualizado em estado.salvarAgente).
+ *
+ * Sem isso, corrigir um texto errado no agente não resolve nada numa
+ * conversa que já estava rolando: a conversa inteira — inclusive o que o
+ * próprio agente respondeu com o texto ANTIGO — continua indo para o
+ * modelo a cada rodada, e ele tende a manter o padrão que já apareceu ali,
+ * mesmo com a instrução nova. A mensagem do cliente nunca é tirada; só a
+ * fala deste agente de antes da edição.
+ */
+function semRespostasDesatualizadas(historico, agente) {
+  const corte = agente.atualizadoEm ? Date.parse(agente.atualizadoEm) : NaN
+  if (!Number.isFinite(corte)) return historico
+  return historico.filter((m) => !(m.de === 'agente' && m.agenteId === agente.id && Date.parse(m.em) < corte))
+}
+
 /* ------------------------------------------------------------------ */
 /* Resposta                                                            */
 /* ------------------------------------------------------------------ */
@@ -307,7 +324,10 @@ export async function responderConversa(conversaId) {
   if (conv.conexaoId) conexoes.digitando(conv.conexaoId, conv.jid || conv.telefone, true)
 
   try {
-    const mensagensApi = historicoParaApi(historico, Number(ajustes.memoriaDeMensagens) || 24)
+    const mensagensApi = historicoParaApi(
+      semRespostasDesatualizadas(historico, agente),
+      Number(ajustes.memoriaDeMensagens) || 24,
+    )
     if (!mensagensApi.length) return
 
     const resultado = await rodarAgente({

@@ -174,7 +174,12 @@ export function salvarAgente(dados) {
   if (dados.id) {
     const i = lista.findIndex((a) => a.id === dados.id)
     if (i >= 0) {
-      lista[i] = { ...lista[i], ...dados }
+      // Marca a hora da edição: é o que faz o atendimento parar de levar em
+      // conta, na conversa, o que esse agente respondeu ANTES da mudança —
+      // sem isso, o modelo continua "ecoando" o jeito antigo de responder
+      // (pelo próprio histórico da conversa) mesmo depois de corrigido o
+      // texto que deu origem ao problema.
+      lista[i] = { ...lista[i], ...dados, atualizadoEm: agora() }
       // só um agente pode ser o de triagem
       if (dados.triagem) {
         for (const outro of lista) if (outro.id !== dados.id) outro.triagem = false
@@ -205,6 +210,7 @@ export function salvarAgente(dados) {
     perguntasFrequentes: [],
     regrasEscalonamento: '',
     criadoEm: agora(),
+    atualizadoEm: agora(),
     ...dados,
   }
   if (novo.triagem) for (const outro of lista) outro.triagem = false
