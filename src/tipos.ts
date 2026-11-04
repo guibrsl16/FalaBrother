@@ -37,6 +37,13 @@ export interface Agente {
   esforco: Esforco
   raciocinio: boolean
   maxTokens: number
+  /**
+   * Quantos segundos esperar depois da última mensagem do cliente antes de
+   * responder — dá tempo da pessoa mandar mais de uma mensagem seguida, que
+   * entram todas juntas na mesma resposta. Vazio/nulo usa o padrão da casa,
+   * definido em Ajustes.
+   */
+  tempoRespostaSegundos: number | null
   saudacao: string
   /** Contexto: quem costuma chegar até este agente e o que descobrir antes de explicar o curso. */
   introducao: string

@@ -201,6 +201,7 @@ export function salvarAgente(dados) {
     esforco: 'low',
     raciocinio: false,
     maxTokens: 1024,
+    tempoRespostaSegundos: null,
     saudacao: '',
     introducao: '',
     regras: '',

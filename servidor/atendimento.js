@@ -63,7 +63,7 @@ export async function receberDoWhatsapp(recebidas, origem = {}) {
 
     if (conexaoId) conexoes.marcarComoLida(conexaoId, bruta.chave)
     else whatsapp.marcarComoLida(bruta.waId)
-    agendarResposta(conv.id)
+    agendarResposta(conv.id, bruta.texto)
   }
 }
 
@@ -167,8 +167,26 @@ export function atualizarStatus(status) {
 /* Espera antes de responder                                           */
 /* ------------------------------------------------------------------ */
 
-function agendarResposta(conversaId) {
-  const espera = Math.max(0, Number(estado.ajustes().segundosDeEspera) || 0) * 1000
+/**
+ * Cada agente pode ter o próprio tempo de espera (tela Agentes); sem isso
+ * definido, vale o padrão da casa, em Ajustes. É esse tempo que dá chance da
+ * pessoa mandar mais de uma mensagem seguida — todas entram juntas na mesma
+ * resposta (ver historicoParaApi, em claude.js, que junta mensagens em
+ * sequência do mesmo papel antes de mandar para o modelo).
+ */
+function tempoDeEsperaPara(conv, ultimoTexto) {
+  const agente = escolherAgente(conv, ultimoTexto)
+  const doAgente = agente?.tempoRespostaSegundos
+  const segundos =
+    doAgente === null || doAgente === undefined || doAgente === ''
+      ? Number(estado.ajustes().segundosDeEspera) || 0
+      : Number(doAgente) || 0
+  return Math.max(0, segundos) * 1000
+}
+
+function agendarResposta(conversaId, ultimoTexto) {
+  const conv = estado.conversa(conversaId)
+  const espera = conv ? tempoDeEsperaPara(conv, ultimoTexto) : 0
   marcarTimer(conversaId, espera)
 }
 

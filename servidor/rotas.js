@@ -295,6 +295,14 @@ function limparAgente(corpo) {
   if (dados.maxTokens !== undefined) {
     dados.maxTokens = Math.min(4096, Math.max(128, Number(dados.maxTokens) || 1024))
   }
+  if (dados.tempoRespostaSegundos !== undefined) {
+    const n = Number(dados.tempoRespostaSegundos)
+    // vazio, nulo ou inválido = usa o padrão da casa (Ajustes → Espera antes de responder)
+    dados.tempoRespostaSegundos =
+      dados.tempoRespostaSegundos === null || dados.tempoRespostaSegundos === '' || !Number.isFinite(n)
+        ? null
+        : Math.min(120, Math.max(0, n))
+  }
   if (typeof dados.palavrasChave === 'string') {
     dados.palavrasChave = dados.palavrasChave
       .split(',')

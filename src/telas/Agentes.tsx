@@ -418,6 +418,22 @@ function EditorDeAgente({ agente, aoFechar }: { agente: Agente; aoFechar: () => 
               <div className="dica">Mais preciso em caso difícil, mais lento e mais caro.</div>
             </div>
           </div>
+
+          <Campo
+            rotulo="Tempo de resposta (segundos)"
+            dica="Quanto tempo esperar depois da última mensagem do cliente antes de responder. Se ele mandar mais de uma mensagem nesse intervalo, todas entram juntas numa resposta só. Em branco usa o padrão da casa, definido em Ajustes."
+          >
+            <input
+              type="number"
+              min={0}
+              max={120}
+              placeholder={`Padrão da casa (${loja.ajustes?.segundosDeEspera ?? 6}s)`}
+              value={rascunho.tempoRespostaSegundos ?? ''}
+              onChange={(e) =>
+                mexer({ tempoRespostaSegundos: e.target.value === '' ? null : Number(e.target.value) })
+              }
+            />
+          </Campo>
         </>
       )}
 

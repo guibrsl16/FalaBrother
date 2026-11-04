@@ -150,6 +150,7 @@ function agenteDeCurso(curso, nomeDoAtendente, secoes, palavrasChave) {
     esforco: 'low',
     raciocinio: false,
     maxTokens: 1024,
+    tempoRespostaSegundos: null,
     saudacao: '',
     introducao: secoes.introducao || '',
     regras: secoes.regras || '',
@@ -275,6 +276,7 @@ export const AGENTES_PADRAO = [
     esforco: 'low',
     raciocinio: false,
     maxTokens: 1024,
+    tempoRespostaSegundos: null,
     saudacao:
       'Oi! Aqui é a Brotherhood Cursos. Que bom te ver por aqui. Me conta: o que você está querendo aprender?',
     introducao: SECOES_RECEPCAO.introducao,
