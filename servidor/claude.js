@@ -82,7 +82,21 @@ function montarSistema(agente, contexto) {
 
   const estavel = [POSTURA_DA_CASA, '', '=== CATÁLOGO DA ESCOLA ===', catalogoCompleto()]
 
-  const doAgente = ['=== SEU PAPEL ===', agente.instrucoes || '']
+  // O texto de cada agente vem dividido por área — regras primeiro (o que
+  // rege a conversa), depois introdução (contexto de quem chega), depois a
+  // ficha do curso, e só então valores (o investimento fica deliberadamente
+  // depois do resto, para o agente não pular direto para preço). Cada bloco
+  // só aparece se tiver conteúdo, então um agente pode preencher só o que
+  // fizer sentido para ele.
+  const doAgente = ['=== SEU PAPEL ===', agente.papel || `Especialista em ${agente.nome}`]
+
+  if (agente.regras) {
+    doAgente.push('', '=== REGRAS DESTE AGENTE (siga à risca, nesta ordem) ===', agente.regras)
+  }
+
+  if (agente.introducao) {
+    doAgente.push('', '=== INTRODUÇÃO — quem chega até você e o que descobrir primeiro ===', agente.introducao)
+  }
 
   if (agente.nomeDoAtendente) {
     doAgente.push(
@@ -95,6 +109,18 @@ function montarSistema(agente, contexto) {
   const meuCurso = agente.cursoId ? buscarCurso(agente.cursoId) : null
   if (meuCurso) {
     doAgente.push('', '=== O CURSO QUE VOCÊ REPRESENTA ===', fichaDoCurso(meuCurso))
+  }
+
+  if (agente.valores) {
+    doAgente.push(
+      '',
+      '=== VALORES — só use isto depois de explicar o curso e tirar as dúvidas (ou se perguntarem direto) ===',
+      agente.valores,
+    )
+  }
+
+  if (agente.instrucoes) {
+    doAgente.push('', '=== OUTRAS INSTRUÇÕES ===', agente.instrucoes)
   }
 
   if (agente.perguntasFrequentes?.length) {

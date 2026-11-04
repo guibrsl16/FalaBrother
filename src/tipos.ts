@@ -38,6 +38,13 @@ export interface Agente {
   raciocinio: boolean
   maxTokens: number
   saudacao: string
+  /** Contexto: quem costuma chegar até este agente e o que descobrir antes de explicar o curso. */
+  introducao: string
+  /** O que rege a conversa — ordem a seguir, cuidados, o que nunca fazer. */
+  regras: string
+  /** Como e quando apresentar investimento/preço, e o que destacar junto. */
+  valores: string
+  /** Texto livre para o que não couber nas três áreas acima. */
   instrucoes: string
   palavrasChave: string[]
   perguntasFrequentes: PerguntaFrequente[]

@@ -46,9 +46,13 @@ export default function Agentes() {
         papel: curso ? `Especialista em ${curso.nome}` : '',
         cursoId: cursoId || null,
         palavrasChave: curso ? [curso.nome.toLowerCase()] : [],
-        instrucoes: curso
-          ? `Você é o especialista em ${curso.nome} da Brotherhood Cursos.\n\nQUEM CHEGA ATÉ VOCÊ\n\n\nO QUE PERGUNTAR\n-\n\nO QUE DESTACAR\n-`
+        introducao: curso
+          ? `Você é o especialista em ${curso.nome} da Brotherhood Cursos.\n\nQuem costuma chegar até você:\n\nO que perguntar antes de explicar o curso:\n-`
           : '',
+        regras: curso
+          ? '1. Entenda o que a pessoa quer antes de explicar o curso.\n2. Explique o curso e tire as dúvidas dela.\n3. Só depois disso fale de investimento — ou antes, se ela perguntar direto.'
+          : '',
+        valores: curso ? 'O que destacar junto do investimento:\n-' : '',
         regrasEscalonamento:
           'Transfira para um atendente quando a pessoa pedir desconto, quiser fechar a matrícula, reclamar de algo ou falar de dinheiro já pago.',
       })
@@ -133,7 +137,8 @@ export default function Agentes() {
                 </div>
 
                 <div className="instrucao-previa">
-                  {a.instrucoes?.trim() || 'Sem instruções — este agente vai improvisar. Vale escrever.'}
+                  {a.introducao?.trim() || a.regras?.trim() || a.valores?.trim() || a.instrucoes?.trim() ||
+                    'Sem instruções — este agente vai improvisar. Vale escrever.'}
                 </div>
 
                 <div className="rodape">
@@ -316,14 +321,54 @@ function EditorDeAgente({ agente, aoFechar }: { agente: Agente; aoFechar: () => 
 
       {aba === 'instrucoes' && (
         <>
+          <div style={{ fontSize: 12.5, color: 'var(--txt-3)', lineHeight: 1.55, marginBottom: 4 }}>
+            As instruções vão para o agente nesta ordem: primeiro <strong>Regras</strong> (o que rege a
+            conversa), depois <strong>Introdução</strong> (quem chega até ele) e por último{' '}
+            <strong>Valores</strong> — de propósito, para o agente só falar de preço depois de explicar o
+            curso e tirar as dúvidas, não antes.
+          </div>
+
           <Campo
-            rotulo="Instruções do agente"
-            dica="Quem ele é, quem costuma procurar por ele, o que perguntar e o que destacar. Escreva como se estivesse treinando alguém no primeiro dia."
+            rotulo="Regras"
+            dica='A ordem a seguir na conversa, o que nunca fazer, o que é específico deste curso. Ex.: "1. Pergunte o objetivo antes de explicar o curso. 2. Explique e tire dúvidas. 3. Só depois fale de investimento."'
           >
             <textarea
-              className="instrucoes"
+              className="instrucoes instrucoes-secao"
+              value={rascunho.regras}
+              onChange={(e) => mexer({ regras: e.target.value })}
+            />
+          </Campo>
+
+          <Campo
+            rotulo="Introdução"
+            dica="Quem costuma chegar até este agente (perfil, receio, objetivo) e o que descobrir antes de explicar o curso."
+          >
+            <textarea
+              className="instrucoes instrucoes-secao"
+              value={rascunho.introducao}
+              onChange={(e) => mexer({ introducao: e.target.value })}
+            />
+          </Campo>
+
+          <Campo
+            rotulo="Valores"
+            dica="Como apresentar o investimento quando chegar a hora: o que destacar junto do preço para justificá-lo."
+          >
+            <textarea
+              className="instrucoes instrucoes-secao"
+              value={rascunho.valores}
+              onChange={(e) => mexer({ valores: e.target.value })}
+            />
+          </Campo>
+
+          <Campo
+            rotulo="Outras instruções (opcional)"
+            dica="Qualquer coisa que não caiba nas três áreas acima."
+          >
+            <textarea
               value={rascunho.instrucoes}
               onChange={(e) => mexer({ instrucoes: e.target.value })}
+              rows={3}
             />
           </Campo>
 
