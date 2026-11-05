@@ -908,6 +908,10 @@ textarea.instrucoes {
   line-height: 1.6;
 }
 
+textarea.instrucoes-secao {
+  min-height: 140px;
+}
+
 input:focus,
 select:focus,
 textarea:focus {

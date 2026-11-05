@@ -83,7 +83,21 @@ function montarSistema(agente, contexto) {
 
   const estavel = [POSTURA_DA_CASA, '', '=== CATÁLOGO DA ESCOLA ===', catalogoCompleto()]
 
-  const doAgente = ['=== SEU PAPEL ===', agente.instrucoes || '']
+  // O texto de cada agente vem dividido por área — regras primeiro (o que
+  // rege a conversa), depois introdução (contexto de quem chega), depois a
+  // ficha do curso, e só então valores (o investimento fica deliberadamente
+  // depois do resto, para o agente não pular direto para preço). Cada bloco
+  // só aparece se tiver conteúdo, então um agente pode preencher só o que
+  // fizer sentido para ele.
+  const doAgente = ['=== SEU PAPEL ===', agente.papel || `Especialista em ${agente.nome}`]
+
+  if (agente.regras) {
+    doAgente.push('', '=== REGRAS DESTE AGENTE (siga à risca, nesta ordem) ===', agente.regras)
+  }
+
+  if (agente.introducao) {
+    doAgente.push('', '=== INTRODUÇÃO — quem chega até você e o que descobrir primeiro ===', agente.introducao)
+  }
 
   if (agente.nomeDoAtendente) {
     doAgente.push(
@@ -95,6 +109,18 @@ function montarSistema(agente, contexto) {
 
   if (!agente.triagem) {
     doAgente.push('', '=== O CURSO QUE VOCÊ REPRESENTA ===', fichaDoAgente(agente))
+  }
+
+  if (agente.valores) {
+    doAgente.push(
+      '',
+      '=== VALORES — só use isto depois de explicar o curso e tirar as dúvidas (ou se perguntarem direto) ===',
+      agente.valores,
+    )
+  }
+
+  if (agente.instrucoes) {
+    doAgente.push('', '=== OUTRAS INSTRUÇÕES ===', agente.instrucoes)
   }
 
   if (agente.perguntasFrequentes?.length) {
@@ -119,6 +145,9 @@ function montarSistema(agente, contexto) {
   }
 
   doAgente.push(
+    '',
+    '=== LEMBRETE FINAL, antes de escrever ===',
+    'Releia o que você já mandou nesta conversa: se a pessoa não respondeu à sua última pergunta, não repita a mesma pergunta com outras palavras — siga adiante. Todo número que você disser — preço, parcela, mês, hora, vaga, encontro — tem que estar, exatamente, na ficha do curso desta conversa. Se não estiver lá, não escreva o número: diga que vai confirmar e, se for o caso, chame transferir_para_atendente.',
     '',
     '=== FERRAMENTAS ===',
     'transferir_para_atendente: use quando a regra acima pedir. Depois de chamá-la, escreva uma última mensagem curta avisando que alguém da equipe vai continuar.',
@@ -226,6 +255,58 @@ function ferramentas() {
       strict: true,
     },
   ]
+}
+
+/* ------------------------------------------------------------------ */
+/* Guarda contra valor inventado                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Checagem no código, não no prompt: todo número sensível que o agente
+ * escrever — preço, parcelas, meses, horas, vagas, encontros — precisa
+ * aparecer, literalmente, na ficha do curso que ele representa. Pedir ao
+ * modelo para não inventar esses números ajuda, mas não garante nada — isso
+ * garante. Agente sem curso (a Recepção) nunca pode citar número sensível
+ * nenhum, porque não tem ficha própria.
+ */
+const PADRAO_QUANTIDADE_SENSIVEL =
+  /R\$\s*(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s*x\b|(\d+(?:[.,]\d+)?)\s*(?:hora|horas|m[eê]s|meses|pessoa|pessoas|aluno|alunos|vaga|vagas|encontro|encontros|parcela|parcelas)\b/gi
+
+function numerosDaFicha(agente) {
+  if (!agente || agente.triagem) return new Set()
+  return new Set((fichaDoAgente(agente).match(/\d+(?:[.,]\d+)?/g) || []).map((n) => n.replace(',', '.')))
+}
+
+function valorForaDoCatalogo(texto, agenteAtual) {
+  const permitidos = numerosDaFicha(agenteAtual)
+  for (const m of texto.matchAll(PADRAO_QUANTIDADE_SENSIVEL)) {
+    const numero = (m[1] || m[2] || m[3]).replace(',', '.')
+    if (!permitidos.has(numero)) return true
+  }
+  return false
+}
+
+const AVISO_VALOR_INVENTADO = 'Deixa eu confirmar esse número certinho com a equipe antes de te passar — só um instante.'
+
+/* ------------------------------------------------------------------ */
+/* Resposta em vários balões                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * O prompt pede mensagens curtas, no estilo WhatsApp. Quando uma resposta
+ * não cabe em poucas linhas, o agente não deve prometer "te conto depois" —
+ * não existe um próximo turno automático, só quando a pessoa escrever de
+ * novo. Em vez disso, ele escreve a resposta inteira já nesta mensagem,
+ * dividida em partes por uma linha só com ">>>", e cada parte vira uma
+ * mensagem de WhatsApp própria, mandada em sequência (ver atendimento.js).
+ */
+const SEPARADOR_DE_BALAO = /^[ \t]*>{3,}[ \t]*$/m
+
+function dividirEmBaloes(texto) {
+  return (texto || '')
+    .split(SEPARADOR_DE_BALAO)
+    .map((parte) => parte.trim())
+    .filter(Boolean)
 }
 
 /* ------------------------------------------------------------------ */
@@ -338,6 +419,7 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
     if (resposta.stop_reason === 'refusal') {
       return {
         texto: '',
+        partes: [],
         recusa: resposta.stop_details?.explanation || 'A resposta foi recusada por segurança.',
         transferir: {
           motivo: 'outro',
@@ -358,7 +440,28 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
     const chamadas = resposta.content.filter((b) => b.type === 'tool_use')
 
     if (!chamadas.length) {
-      return { texto, transferir: null, acoes, uso, agenteId: agenteAtual.id }
+      if (texto && valorForaDoCatalogo(texto, agenteAtual)) {
+        return {
+          texto: AVISO_VALOR_INVENTADO,
+          partes: [AVISO_VALOR_INVENTADO],
+          transferir: {
+            motivo: 'fora_do_catalogo',
+            resumo: 'O agente ia citar um valor que não está na ficha do curso — passando para confirmar com a equipe.',
+          },
+          acoes,
+          uso,
+          agenteId: agenteAtual.id,
+        }
+      }
+      const partes = dividirEmBaloes(texto)
+      return {
+        texto: partes.length ? partes.join('\n\n') : texto,
+        partes: partes.length ? partes : texto ? [texto] : [],
+        transferir: null,
+        acoes,
+        uso,
+        agenteId: agenteAtual.id,
+      }
     }
 
     // devolve a fala do assistente inteira (texto + chamadas) para o histórico
@@ -456,13 +559,19 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
       })
       uso.entrada += despedida.usage?.input_tokens || 0
       uso.saida += despedida.usage?.output_tokens || 0
-      const textoFinal = despedida.content
+      let textoFinal = despedida.content
         .filter((b) => b.type === 'text')
         .map((b) => b.text)
         .join('\n')
         .trim()
+      textoFinal = textoFinal || texto
+      if (textoFinal && valorForaDoCatalogo(textoFinal, agenteAtual)) {
+        textoFinal = AVISO_VALOR_INVENTADO
+      }
+      const partesFinal = dividirEmBaloes(textoFinal)
       return {
-        texto: textoFinal || texto,
+        texto: partesFinal.length ? partesFinal.join('\n\n') : textoFinal,
+        partes: partesFinal.length ? partesFinal : textoFinal ? [textoFinal] : [],
         transferir,
         acoes,
         uso,
@@ -473,6 +582,7 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
 
   return {
     texto: '',
+    partes: [],
     transferir: {
       motivo: 'outro',
       resumo: 'O agente ficou dando voltas sem concluir. Vale um olhar humano.',

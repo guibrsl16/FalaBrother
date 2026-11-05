@@ -24,6 +24,13 @@ const timersDeEspera = new Map()
 const trancadas = new Set()
 const avisoForaDoHorario = new Map()
 
+/** Pausa entre um balão e outro, quando o agente divide a resposta em mais de uma mensagem. */
+const PAUSA_ENTRE_BALOES_MS = 1200
+
+function esperarMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /* ------------------------------------------------------------------ */
 /* Entrada                                                             */
 /* ------------------------------------------------------------------ */
@@ -56,7 +63,7 @@ export async function receberDoWhatsapp(recebidas, origem = {}) {
 
     if (conexaoId) conexoes.marcarComoLida(conexaoId, bruta.chave)
     else whatsapp.marcarComoLida(bruta.waId)
-    agendarResposta(conv.id)
+    agendarResposta(conv.id, bruta.texto)
   }
 }
 
@@ -160,9 +167,37 @@ export function atualizarStatus(status) {
 /* Espera antes de responder                                           */
 /* ------------------------------------------------------------------ */
 
-function agendarResposta(conversaId) {
-  const espera = Math.max(0, Number(estado.ajustes().segundosDeEspera) || 0) * 1000
+/**
+ * Cada agente pode ter o próprio tempo de espera (tela Agentes); sem isso
+ * definido, vale o padrão da casa, em Ajustes. É esse tempo que dá chance da
+ * pessoa mandar mais de uma mensagem seguida — todas entram juntas na mesma
+ * resposta (ver historicoParaApi, em claude.js, que junta mensagens em
+ * sequência do mesmo papel antes de mandar para o modelo).
+ */
+function tempoDeEsperaPara(conv, ultimoTexto) {
+  const agente = escolherAgente(conv, ultimoTexto)
+  const doAgente = agente?.tempoRespostaSegundos
+  const segundos =
+    doAgente === null || doAgente === undefined || doAgente === ''
+      ? Number(estado.ajustes().segundosDeEspera) || 0
+      : Number(doAgente) || 0
+  return Math.max(0, segundos) * 1000
+}
 
+function agendarResposta(conversaId, ultimoTexto) {
+  const conv = estado.conversa(conversaId)
+  const espera = conv ? tempoDeEsperaPara(conv, ultimoTexto) : 0
+  marcarTimer(conversaId, espera)
+}
+
+/** Tenta de novo rápido, sem reiniciar a espera cheia de novo — a pessoa já tinha terminado de escrever. */
+const RETENTATIVA_TRANCADA_MS = 1500
+
+function reagendarEmBreve(conversaId) {
+  marcarTimer(conversaId, RETENTATIVA_TRANCADA_MS)
+}
+
+function marcarTimer(conversaId, atrasoMs) {
   const anterior = timersDeEspera.get(conversaId)
   if (anterior) clearTimeout(anterior)
 
@@ -171,7 +206,7 @@ function agendarResposta(conversaId) {
     responderConversa(conversaId).catch((erro) => {
       console.error('[atendimento] falha ao responder:', erro)
     })
-  }, espera)
+  }, atrasoMs)
 
   timersDeEspera.set(conversaId, timer)
 }
@@ -210,12 +245,36 @@ function escolherAgente(conv, ultimoTexto) {
   return estado.agenteDeTriagem()
 }
 
+/**
+ * Tira do histórico as respostas que ESTE agente deu antes da última vez que
+ * ele foi editado (campo `atualizadoEm`, atualizado em estado.salvarAgente).
+ *
+ * Sem isso, corrigir um texto errado no agente não resolve nada numa
+ * conversa que já estava rolando: a conversa inteira — inclusive o que o
+ * próprio agente respondeu com o texto ANTIGO — continua indo para o
+ * modelo a cada rodada, e ele tende a manter o padrão que já apareceu ali,
+ * mesmo com a instrução nova. A mensagem do cliente nunca é tirada; só a
+ * fala deste agente de antes da edição.
+ */
+function semRespostasDesatualizadas(historico, agente) {
+  const corte = agente.atualizadoEm ? Date.parse(agente.atualizadoEm) : NaN
+  if (!Number.isFinite(corte)) return historico
+  return historico.filter((m) => !(m.de === 'agente' && m.agenteId === agente.id && Date.parse(m.em) < corte))
+}
+
 /* ------------------------------------------------------------------ */
 /* Resposta                                                            */
 /* ------------------------------------------------------------------ */
 
 export async function responderConversa(conversaId) {
-  if (trancadas.has(conversaId)) return
+  // Chegou um pedaço da mensagem enquanto a resposta ao pedaço anterior ainda
+  // estava sendo gerada: não é "não há o que fazer" — é só muito cedo. Tenta
+  // de novo em breve, em vez de descartar (senão esse pedaço fica sem
+  // resposta até a pessoa escrever outra coisa).
+  if (trancadas.has(conversaId)) {
+    reagendarEmBreve(conversaId)
+    return
+  }
   const conv = estado.conversa(conversaId)
   if (!conv) return
 
@@ -285,7 +344,10 @@ export async function responderConversa(conversaId) {
   if (conv.conexaoId) conexoes.digitando(conv.conexaoId, conv.jid || conv.telefone, true)
 
   try {
-    const mensagensApi = historicoParaApi(historico, Number(ajustes.memoriaDeMensagens) || 24)
+    const mensagensApi = historicoParaApi(
+      semRespostasDesatualizadas(historico, agente),
+      Number(ajustes.memoriaDeMensagens) || 24,
+    )
     if (!mensagensApi.length) return
 
     const resultado = await rodarAgente({
@@ -298,13 +360,49 @@ export async function responderConversa(conversaId) {
       },
     })
 
+    // Trava no código, não só no prompt: se o agente ia mandar exatamente a
+    // mensagem que ele mesmo já mandou por último nesta conversa, isso é
+    // sinal de loop — passa para um atendente em vez de repetir. O último
+    // "turno" do agente pode ter saído em vários balões (ver dividirEmBaloes
+    // em claude.js); junta todos eles, na ordem, para comparar com a
+    // resposta nova inteira — não só com o balão final.
+    let fimDoUltimoTurno = -1
+    for (let i = historico.length - 1; i >= 0; i -= 1) {
+      if (historico[i].de === 'agente') {
+        fimDoUltimoTurno = i
+        break
+      }
+    }
+    const ultimoTurnoDoAgente = []
+    for (let i = fimDoUltimoTurno; i >= 0 && historico[i].de === 'agente'; i -= 1) {
+      ultimoTurnoDoAgente.unshift(historico[i].texto)
+    }
+    const textoDoUltimoTurno = ultimoTurnoDoAgente.join('\n\n')
+    if (resultado.texto && textoDoUltimoTurno && normalizarParaComparar(textoDoUltimoTurno) === normalizarParaComparar(resultado.texto)) {
+      resultado.texto = ''
+      resultado.partes = []
+      if (!resultado.transferir) {
+        resultado.transferir = {
+          motivo: 'outro',
+          resumo: 'O agente ia repetir a última mensagem — passando para um atendente conferir.',
+        }
+      }
+    }
+
     await aplicarAcoes(conv, resultado)
 
-    if (resultado.texto) {
-      await enviar(conv, resultado.texto, {
+    // o agente pode dividir a resposta em vários balões (ver dividirEmBaloes
+    // em claude.js) — manda um atrás do outro, com uma pausa curta entre
+    // eles, igual alguém digitando em sequência. O custo da chamada (uso)
+    // vai só no primeiro balão, para não contar o mesmo gasto várias vezes
+    // nos indicadores.
+    const baloes = resultado.partes?.length ? resultado.partes : resultado.texto ? [resultado.texto] : []
+    for (let i = 0; i < baloes.length; i += 1) {
+      if (i > 0) await esperarMs(PAUSA_ENTRE_BALOES_MS)
+      await enviar(conv, baloes[i], {
         de: 'agente',
         agenteId: resultado.agenteId || agente.id,
-        uso: resultado.uso,
+        uso: i === 0 ? resultado.uso : null,
       })
     }
 
@@ -336,6 +434,11 @@ export async function responderConversa(conversaId) {
     publicar('parou-de-digitar', { conversaId })
     if (conv.conexaoId) conexoes.digitando(conv.conexaoId, conv.jid || conv.telefone, false)
   }
+}
+
+/** Ignora espaço e maiúscula/minúscula para comparar se duas mensagens são "a mesma". */
+function normalizarParaComparar(texto) {
+  return (texto || '').toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
 function rotuloMotivo(motivo) {

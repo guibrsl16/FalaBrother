@@ -32,7 +32,21 @@ export interface Agente {
   esforco: Esforco
   raciocinio: boolean
   maxTokens: number
+  /**
+   * Quantos segundos esperar depois da última mensagem do cliente antes de
+   * responder — dá tempo da pessoa mandar mais de uma mensagem seguida, que
+   * entram todas juntas na mesma resposta. Vazio/nulo usa o padrão da casa,
+   * definido em Ajustes.
+   */
+  tempoRespostaSegundos: number | null
   saudacao: string
+  /** Contexto: quem costuma chegar até este agente e o que descobrir antes de explicar o curso. */
+  introducao: string
+  /** O que rege a conversa — ordem a seguir, cuidados, o que nunca fazer. */
+  regras: string
+  /** Como e quando apresentar investimento/preço, e o que destacar junto. */
+  valores: string
+  /** Texto livre para o que não couber nas três áreas acima. */
   instrucoes: string
   palavrasChave: string[]
   perguntasFrequentes: PerguntaFrequente[]
@@ -228,6 +242,8 @@ export interface Pareamento {
 
 export interface ResultadoTeste {
   texto: string
+  /** A mesma resposta, dividida nas mensagens que seriam mandadas em sequência no WhatsApp. */
+  partes?: string[]
   recusa?: string
   transferir: { motivo: string; resumo: string } | null
   acoes: { tipo: string; [k: string]: unknown }[]

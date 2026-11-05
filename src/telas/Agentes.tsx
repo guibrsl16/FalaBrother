@@ -102,7 +102,8 @@ export default function Agentes() {
               </div>
 
               <div className="instrucao-previa">
-                {a.instrucoes?.trim() || 'Sem instruções — este agente vai improvisar. Vale escrever.'}
+                {a.introducao?.trim() || a.regras?.trim() || a.valores?.trim() || a.instrucoes?.trim() ||
+                  'Sem instruções — este agente vai improvisar. Vale escrever.'}
               </div>
 
               <div className="rodape">
@@ -270,14 +271,54 @@ function EditorDeAgente({ agente, aoFechar }: { agente: Agente; aoFechar: () => 
 
       {aba === 'instrucoes' && (
         <>
+          <div style={{ fontSize: 12.5, color: 'var(--txt-3)', lineHeight: 1.55, marginBottom: 4 }}>
+            As instruções vão para o agente nesta ordem: primeiro <strong>Regras</strong> (o que rege a
+            conversa), depois <strong>Introdução</strong> (quem chega até ele) e por último{' '}
+            <strong>Valores</strong> — de propósito, para o agente só falar de preço depois de explicar o
+            curso e tirar as dúvidas, não antes.
+          </div>
+
           <Campo
-            rotulo="Instruções do agente"
-            dica="Quem ele é, quem costuma procurar por ele, o que perguntar e o que destacar. Escreva como se estivesse treinando alguém no primeiro dia."
+            rotulo="Regras"
+            dica='A ordem a seguir na conversa, o que nunca fazer, o que é específico deste curso. Ex.: "1. Pergunte o objetivo antes de explicar o curso. 2. Explique e tire dúvidas. 3. Só depois fale de investimento."'
           >
             <textarea
-              className="instrucoes"
+              className="instrucoes instrucoes-secao"
+              value={rascunho.regras}
+              onChange={(e) => mexer({ regras: e.target.value })}
+            />
+          </Campo>
+
+          <Campo
+            rotulo="Introdução"
+            dica="Quem costuma chegar até este agente (perfil, receio, objetivo) e o que descobrir antes de explicar o curso."
+          >
+            <textarea
+              className="instrucoes instrucoes-secao"
+              value={rascunho.introducao}
+              onChange={(e) => mexer({ introducao: e.target.value })}
+            />
+          </Campo>
+
+          <Campo
+            rotulo="Valores"
+            dica="Como apresentar o investimento quando chegar a hora: o que destacar junto do preço para justificá-lo."
+          >
+            <textarea
+              className="instrucoes instrucoes-secao"
+              value={rascunho.valores}
+              onChange={(e) => mexer({ valores: e.target.value })}
+            />
+          </Campo>
+
+          <Campo
+            rotulo="Outras instruções (opcional)"
+            dica="Qualquer coisa que não caiba nas três áreas acima."
+          >
+            <textarea
               value={rascunho.instrucoes}
               onChange={(e) => mexer({ instrucoes: e.target.value })}
+              rows={3}
             />
           </Campo>
 
@@ -327,6 +368,22 @@ function EditorDeAgente({ agente, aoFechar }: { agente: Agente; aoFechar: () => 
               <div className="dica">Mais preciso em caso difícil, mais lento e mais caro.</div>
             </div>
           </div>
+
+          <Campo
+            rotulo="Tempo de resposta (segundos)"
+            dica="Quanto tempo esperar depois da última mensagem do cliente antes de responder. Se ele mandar mais de uma mensagem nesse intervalo, todas entram juntas numa resposta só. Em branco usa o padrão da casa, definido em Ajustes."
+          >
+            <input
+              type="number"
+              min={0}
+              max={120}
+              placeholder={`Padrão da casa (${loja.ajustes?.segundosDeEspera ?? 6}s)`}
+              value={rascunho.tempoRespostaSegundos ?? ''}
+              onChange={(e) =>
+                mexer({ tempoRespostaSegundos: e.target.value === '' ? null : Number(e.target.value) })
+              }
+            />
+          </Campo>
         </>
       )}
 
@@ -533,8 +590,9 @@ function BancoDeProvas({ agente }: { agente: Agente }) {
     try {
       const resultado = await api.testarAgente(agente.id, novo)
       setUltimo(resultado)
-      if (resultado.texto) {
-        setHistorico([...novo, { de: 'agente', texto: resultado.texto }])
+      const baloes = resultado.partes?.length ? resultado.partes : resultado.texto ? [resultado.texto] : []
+      if (baloes.length) {
+        setHistorico([...novo, ...baloes.map((texto) => ({ de: 'agente', texto }))])
       }
     } catch (erro) {
       loja.avisar(erro instanceof Error ? erro.message : 'O teste falhou.', 'erro')
