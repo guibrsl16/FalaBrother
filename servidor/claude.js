@@ -487,7 +487,16 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
       }
 
       if (chamada.name === 'registrar_interesse') {
-        const especialista = entrada.agenteId ? agentes().find((a) => a.id === entrada.agenteId) : null
+        // Um agente especialista só atende o próprio curso: o curso de interesse é
+        // sempre ele mesmo, nunca o que o modelo escolher no agenteId (o
+        // parâmetro existe para a Recepção, que de fato precisa apontar qual
+        // especialista — confiar no modelo aqui já causou interesse registrado
+        // num curso que nem foi mencionado na conversa).
+        const especialista = !agenteAtual.triagem
+          ? agenteAtual
+          : entrada.agenteId
+            ? agentes().find((a) => a.id === entrada.agenteId)
+            : null
         const registro = {
           nome: entrada.nome || '',
           curso: especialista ? especialista.nome : '',
