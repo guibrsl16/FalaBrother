@@ -9,7 +9,6 @@ import type {
   Ajustes,
   Conexao,
   Conversa,
-  Curso,
   EstadoInicial,
   Indicadores,
   Mensagem,
@@ -135,13 +134,6 @@ export const api = {
     enviarJson('POST')(`/conexoes/${id}/iniciar`, { novoQr }) as Promise<Conexao>,
   removerConexao: (id: string) => enviarJson('DELETE')(`/conexoes/${id}`),
 
-  /* cursos */
-  cursos: () => pedir<Curso[]>('/cursos'),
-  criarCurso: (dados: Partial<Curso>) => enviarJson('POST')('/cursos', dados) as Promise<Curso>,
-  salvarCurso: (id: string, dados: Partial<Curso>) =>
-    enviarJson('PUT')(`/cursos/${id}`, dados) as Promise<Curso>,
-  apagarCurso: (id: string) => enviarJson('DELETE')(`/cursos/${id}`) as Promise<Curso[]>,
-
   /* ajustes e canal */
   ajustes: () => pedir<Ajustes>('/ajustes'),
   salvarAjustes: (dados: Record<string, unknown>) =>
@@ -175,7 +167,6 @@ export function ouvirEventos(aoEvento: OuvinteEvento, aoMudarConexao: (ligado: b
     'mensagem',
     'mensagem-atualizada',
     'agentes',
-    'cursos',
     'ajustes',
     'conexao',
     'conexao-qr',

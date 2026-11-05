@@ -24,7 +24,6 @@ export const rotas = express.Router()
 rotas.get('/estado', (req, res) => {
   res.json({
     ajustes: estado.semSegredos(),
-    cursos: estado.cursos(),
     agentes: estado.agentes(),
     conversas: estado.conversas(),
     conexoes: conexoes.listar({ comQr: req.usuario.papel === 'admin' }),
@@ -157,7 +156,7 @@ rotas.post('/conversas/:id/mensagens/audio', async (req, res) => {
 rotas.patch('/conversas/:id', (req, res) => {
   const permitido = {}
   const corpo = req.body || {}
-  for (const campo of ['nomeContato', 'cursoId', 'agenteId', 'etiquetas', 'resumo', 'lead']) {
+  for (const campo of ['nomeContato', 'agenteId', 'etiquetas', 'resumo', 'lead']) {
     if (corpo[campo] !== undefined) permitido[campo] = corpo[campo]
   }
   const conv = estado.atualizarConversa(req.params.id, permitido)
@@ -333,31 +332,6 @@ rotas.post('/agentes/:id/testar', async (req, res) => {
     res.status(500).json({ erro: erro.message })
   }
 })
-
-/* ------------------------------------------------------------------ */
-/* Cursos                                                              */
-/* ------------------------------------------------------------------ */
-
-rotas.get('/cursos', (req, res) => res.json(estado.cursos()))
-
-rotas.post('/cursos', (req, res) => res.json(estado.salvarCurso(limparCurso(req.body || {}))))
-
-rotas.put('/cursos/:id', (req, res) => {
-  res.json(estado.salvarCurso(limparCurso({ ...(req.body || {}), id: req.params.id })))
-})
-
-rotas.delete('/cursos/:id', (req, res) => res.json(estado.apagarCurso(req.params.id)))
-
-function limparCurso(corpo) {
-  const dados = { ...corpo }
-  if (typeof dados.diferenciais === 'string') {
-    dados.diferenciais = dados.diferenciais
-      .split('\n')
-      .map((d) => d.trim())
-      .filter(Boolean)
-  }
-  return dados
-}
 
 /* ------------------------------------------------------------------ */
 /* Ajustes e canal                                                     */

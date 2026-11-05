@@ -62,7 +62,7 @@ function combina(conversa: Conversa, filtro: Filtro) {
 
 export default function Conversas() {
   const loja = useLoja()
-  const { conversas, cursos, conexoes, digitando } = loja
+  const { conversas, agentes, conexoes, digitando } = loja
 
   const [filtro, setFiltro] = useState<Filtro>('tudo')
   const [busca, setBusca] = useState('')
@@ -156,7 +156,7 @@ export default function Conversas() {
           )}
 
           {visiveis.map((c) => {
-            const curso = cursos.find((k) => k.id === c.cursoId)
+            const agente = agentes.find((a) => a.id === c.agenteId && !a.triagem)
             return (
               <button
                 key={c.id}
@@ -166,7 +166,7 @@ export default function Conversas() {
                 <div className="avatar-estado">
                   <Avatar
                     nome={c.nomeContato}
-                    cor={curso?.cor}
+                    cor={agente?.cor}
                     foto={c.conexaoId && c.telefone ? api.urlFotoContato(c.conexaoId, c.telefone) : undefined}
                   />
                   <span
@@ -201,9 +201,9 @@ export default function Conversas() {
                   </div>
                   <div className="fila quebra" style={{ marginTop: 3, gap: 4 }}>
                     <SeloEstado estado={c.estado} />
-                    {curso && (
-                      <span className="etiqueta" style={{ color: curso.cor, borderColor: `${curso.cor}55` }}>
-                        {curso.nome}
+                    {c.lead?.curso && (
+                      <span className="etiqueta" style={{ color: agente?.cor, borderColor: agente ? `${agente.cor}55` : undefined }}>
+                        {c.lead.curso}
                       </span>
                     )}
                     {/* só mostra o número quando há mais de um: com um só, seria ruído */}
@@ -826,8 +826,8 @@ const PlayerDeAudio = React.memo(function PlayerDeAudio({
 
 function Ficha({ conversa }: { conversa: Conversa }) {
   const loja = useLoja()
-  const curso = loja.cursos.find((c) => c.id === conversa.cursoId)
   const agente = loja.agentes.find((a) => a.id === conversa.agenteId)
+  const especialista = agente && !agente.triagem ? agente : null
   const conexaoDaConversa = conversa.conexaoId ? loja.conexoes.find((c) => c.id === conversa.conexaoId) : null
   const [novaEtiqueta, setNovaEtiqueta] = useState('')
   const [editandoEtiqueta, setEditandoEtiqueta] = useState(false)
@@ -867,7 +867,7 @@ function Ficha({ conversa }: { conversa: Conversa }) {
         <div className="avatar-estado grande">
           <Avatar
             nome={conversa.nomeContato}
-            cor={curso?.cor}
+            cor={especialista?.cor}
             foto={conversa.conexaoId && conversa.telefone ? api.urlFotoContato(conversa.conexaoId, conversa.telefone) : undefined}
           />
           <span className="ponto-estado-avatar" style={{ background: corDoEstado(conversa.estado) }} title={rotuloEstado(conversa.estado)} />
@@ -944,13 +944,18 @@ function Ficha({ conversa }: { conversa: Conversa }) {
       <div className="bloco">
         <div className="rotulo">Interesse</div>
         <Campo rotulo="Curso">
-          <select value={conversa.cursoId || ''} onChange={(e) => mudar({ cursoId: e.target.value || null })}>
+          <select
+            value={conversa.lead?.curso || ''}
+            onChange={(e) => mudar({ lead: { ...conversa.lead, curso: e.target.value } })}
+          >
             <option value="">— ainda não sei —</option>
-            {loja.cursos.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome}
-              </option>
-            ))}
+            {loja.agentes
+              .filter((a) => !a.triagem)
+              .map((a) => (
+                <option key={a.id} value={a.nome}>
+                  {a.nome}
+                </option>
+              ))}
           </select>
         </Campo>
         <Campo rotulo="Etapa" dica="Fechar matrícula ou marcar como perdido é sempre uma decisão da equipe, nunca da IA.">
@@ -998,25 +1003,25 @@ function Ficha({ conversa }: { conversa: Conversa }) {
         </div>
       )}
 
-      {curso && (
+      {especialista && (
         <div className="bloco">
           <div className="rotulo">Ficha do curso</div>
-          {curso.investimento && (
+          {especialista.investimento && (
             <div className="par">
               <span>Investimento</span>
-              <strong>{curso.investimento}</strong>
+              <strong>{especialista.investimento}</strong>
             </div>
           )}
-          {curso.duracao && (
+          {especialista.duracao && (
             <div className="par">
               <span>Duração</span>
-              <strong>{curso.duracao}</strong>
+              <strong>{especialista.duracao}</strong>
             </div>
           )}
-          {curso.formato && (
+          {especialista.formato && (
             <div className="par">
               <span>Formato</span>
-              <strong>{curso.formato}</strong>
+              <strong>{especialista.formato}</strong>
             </div>
           )}
         </div>

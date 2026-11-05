@@ -11,7 +11,7 @@
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { api, EVENTO_SESSAO_CAIU, ouvirEventos } from './api'
-import type { Agente, Ajustes, Conexao, Conversa, Curso, Indicadores, Mensagem, Sessao } from './tipos'
+import type { Agente, Ajustes, Conexao, Conversa, Indicadores, Mensagem, Sessao } from './tipos'
 
 interface Aviso {
   id: number
@@ -48,7 +48,6 @@ interface Loja {
   fecharCodigos: () => void
 
   ajustes: Ajustes | null
-  cursos: Curso[]
   agentes: Agente[]
   conversas: Conversa[]
   indicadores: Indicadores | null
@@ -65,7 +64,6 @@ interface Loja {
   recarregar: () => Promise<void>
   aplicarConversa: (conversa: Conversa) => void
   aplicarAgentes: (agentes: Agente[]) => void
-  aplicarCursos: (cursos: Curso[]) => void
   aplicarAjustes: (ajustes: Ajustes) => void
   /** Põe (ou atualiza) uma conexão na lista na hora, sem esperar o tempo real. */
   aplicarConexao: (conexao: Conexao) => void
@@ -90,7 +88,6 @@ export function ProvedorDaLoja({ children }: { children: React.ReactNode }) {
   const [codigosNovos, setCodigosNovos] = useState<string[] | null>(null)
 
   const [ajustes, setAjustes] = useState<Ajustes | null>(null)
-  const [cursos, setCursos] = useState<Curso[]>([])
   const [agentes, setAgentes] = useState<Agente[]>([])
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [indicadores, setIndicadores] = useState<Indicadores | null>(null)
@@ -120,7 +117,6 @@ export function ProvedorDaLoja({ children }: { children: React.ReactNode }) {
     try {
       const dados = await api.estado()
       setAjustes(dados.ajustes)
-      setCursos(dados.cursos)
       setAgentes(dados.agentes)
       setConversas(dados.conversas)
       setIndicadores(dados.indicadores)
@@ -324,10 +320,6 @@ export function ProvedorDaLoja({ children }: { children: React.ReactNode }) {
           setAgentes(dados as Agente[])
           return
         }
-        if (tipo === 'cursos') {
-          setCursos(dados as Curso[])
-          return
-        }
         if (tipo === 'conexao') {
           // o estado vem sem o QR (ele chega à parte, só para quem administra):
           // preserva o QR que já temos enquanto a conexão segue aguardando a leitura
@@ -446,7 +438,6 @@ export function ProvedorDaLoja({ children }: { children: React.ReactNode }) {
       mostrarCodigos,
       fecharCodigos,
       ajustes,
-      cursos,
       agentes,
       conversas,
       indicadores,
@@ -458,7 +449,6 @@ export function ProvedorDaLoja({ children }: { children: React.ReactNode }) {
       recarregar,
       aplicarConversa,
       aplicarAgentes: setAgentes,
-      aplicarCursos: setCursos,
       aplicarAjustes: setAjustes,
       aplicarConexao,
       usarMensagens,
@@ -478,7 +468,6 @@ export function ProvedorDaLoja({ children }: { children: React.ReactNode }) {
       mostrarCodigos,
       fecharCodigos,
       ajustes,
-      cursos,
       agentes,
       conversas,
       indicadores,

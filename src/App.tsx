@@ -8,7 +8,6 @@ import {
   IconeConexoes,
   IconeContatos,
   IconeConversas,
-  IconeCursos,
   IconeDashboard,
   IconePainel,
   IconeSair,
@@ -19,7 +18,6 @@ import Conexoes from './telas/Conexoes'
 import Conversas from './telas/Conversas'
 import Contatos from './telas/Contatos'
 import Agentes from './telas/Agentes'
-import CursosTela from './telas/Cursos'
 import Painel from './telas/Painel'
 import Dashboard from './telas/Dashboard'
 import Canal from './telas/Canal'
@@ -83,15 +81,7 @@ const TELAS = [
     nome: 'Agentes',
     grupo: 'Inteligência',
     icone: IconeAgentes,
-    descricao: 'Um agente de IA para cada curso. Instruções, testes e roteamento.',
-    cheia: false,
-  },
-  {
-    chave: 'cursos',
-    nome: 'Cursos',
-    grupo: 'Inteligência',
-    icone: IconeCursos,
-    descricao: 'O catálogo que os agentes usam para responder — preço, duração e formato.',
+    descricao: 'Um agente de IA para cada curso — instruções, ficha, testes e roteamento.',
     cheia: false,
   },
   {
@@ -317,7 +307,6 @@ export default function App() {
           {tela === 'dashboard' && <Dashboard aoIrPara={setTela} />}
           {tela === 'contatos' && <Contatos aoIrPara={setTela} />}
           {tela === 'agentes' && <Agentes />}
-          {tela === 'cursos' && <CursosTela />}
           {tela === 'canal' && <Canal />}
           {tela === 'ajustes' && <AjustesTela />}
         </main>

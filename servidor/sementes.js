@@ -1,99 +1,16 @@
 /**
  * Conteúdo inicial da central de atendimento da Brotherhood Cursos.
  *
- * O catálogo abaixo é um ponto de partida da Brotherhood Cursos — nomes,
- * preços e cargas horárias são EDITÁVEIS na tela "Cursos". Cada curso nasce
- * com um agente de IA próprio, porque a conversa de quem quer aprender Excel
- * não é a mesma de quem quer abrir um negócio: muda o vocabulário, muda a
- * objeção e muda o que precisa ser perguntado antes de falar em matrícula.
+ * Os agentes abaixo são um ponto de partida — nome, cor, resumo, preço e
+ * carga horária de cada um são EDITÁVEIS na tela "Agentes": cada agente já
+ * traz embutida a própria ficha de curso. Um agente por curso, porque a
+ * conversa de quem quer aprender Excel não é a mesma de quem quer abrir um
+ * negócio: muda o vocabulário, muda a objeção e muda o que precisa ser
+ * perguntado antes de falar em matrícula.
  *
- * Além dos agentes de curso existe a Recepção: o agente que atende primeiro,
- * descobre o que a pessoa quer e passa a conversa para o colega certo.
+ * Além dos agentes-especialistas existe a Recepção: o agente que atende
+ * primeiro, descobre o que a pessoa quer e passa a conversa para o colega certo.
  */
-
-export const CURSOS_PADRAO = [
-  {
-    id: 'curso-informatica',
-    nome: 'Informática Essencial',
-    resumo: 'Do zero ao uso confiante do computador, internet e pacote Office.',
-    publico: 'Quem nunca usou computador ou usa com medo de errar.',
-    duracao: '4 meses · 2 encontros por semana',
-    formato: 'Presencial, com computador para cada aluno',
-    investimento: 'Matrícula R$ 90 + 4x R$ 189',
-    certificado: 'Certificado de 120 horas',
-    diferenciais: [
-      'Turmas de no máximo 12 pessoas',
-      'Apostila impressa incluída',
-      'Aula de reposição sem custo',
-    ],
-    cor: '#D8AB55',
-  },
-  {
-    id: 'curso-excel',
-    nome: 'Excel Profissional',
-    resumo: 'Planilhas que resolvem trabalho de verdade: do básico ao dashboard.',
-    publico: 'Quem já mexe no computador e quer subir de cargo ou organizar o próprio negócio.',
-    duracao: '3 meses · 1 encontro por semana',
-    formato: 'Presencial ou ao vivo pela internet',
-    investimento: 'Matrícula R$ 90 + 3x R$ 249',
-    certificado: 'Certificado de 90 horas',
-    diferenciais: [
-      'Fórmulas, tabela dinâmica, gráficos e dashboard',
-      'Projeto final com a planilha do próprio aluno',
-      'Introdução a macros',
-    ],
-    cor: '#4CC38A',
-  },
-  {
-    id: 'curso-administracao',
-    nome: 'Rotinas Administrativas',
-    resumo: 'Como funciona por dentro um escritório: financeiro, estoque, RH e atendimento.',
-    publico:
-      'Quem quer o primeiro emprego em escritório ou já trabalha e quer formalizar o que sabe.',
-    duracao: '5 meses · 2 encontros por semana',
-    formato: 'Presencial',
-    investimento: 'Matrícula R$ 90 + 5x R$ 219',
-    certificado: 'Certificado de 200 horas',
-    diferenciais: [
-      'Departamento pessoal e folha na prática',
-      'Emissão de nota fiscal e controle de caixa',
-      'Encaminhamento para vagas parceiras',
-    ],
-    cor: '#56C2E8',
-  },
-  {
-    id: 'curso-marketing',
-    nome: 'Marketing Digital',
-    resumo: 'Vender pela internet: conteúdo, tráfego pago e atendimento que fecha.',
-    publico: 'Dono de negócio local e quem quer trabalhar como social media.',
-    duracao: '4 meses · 2 encontros por semana',
-    formato: 'Presencial com laboratório',
-    investimento: 'Matrícula R$ 90 + 4x R$ 279',
-    certificado: 'Certificado de 160 horas',
-    diferenciais: [
-      'Instagram, WhatsApp Business e Google Meu Negócio',
-      'Anúncios com verba real em sala',
-      'Portfólio pronto ao final',
-    ],
-    cor: '#B58CF0',
-  },
-  {
-    id: 'curso-design',
-    nome: 'Design Gráfico',
-    resumo: 'Criar peças que vendem — do cartão de visita ao feed inteiro.',
-    publico: 'Quem quer viver de criação ou cuidar do visual do próprio negócio.',
-    duracao: '5 meses · 2 encontros por semana',
-    formato: 'Presencial com laboratório',
-    investimento: 'Matrícula R$ 90 + 5x R$ 289',
-    certificado: 'Certificado de 200 horas',
-    diferenciais: [
-      'Photoshop, Illustrator e Canva Pro',
-      'Teoria da cor e tipografia aplicadas',
-      'Como precificar um trabalho freelance',
-    ],
-    cor: '#F09A3E',
-  },
-]
 
 /** Instruções comuns a todos os agentes — o jeito Brotherhood de atender. */
 export const POSTURA_DA_CASA = [
@@ -127,13 +44,20 @@ export const POSTURA_DA_CASA = [
   '7. Convide para uma visita ou uma conversa com a equipe quando ela demonstrar interesse claro.',
 ].join('\n')
 
-function agenteDeCurso(curso, nomeDoAtendente, instrucoes, palavrasChave) {
+function agenteEspecialista({ id, nomeDoAtendente, instrucoes, palavrasChave, ...curso }) {
   return {
-    id: 'agente-' + curso.id,
+    id,
     nome: curso.nome,
     nomeDoAtendente,
     papel: 'Especialista em ' + curso.nome,
-    cursoId: curso.id,
+    resumo: curso.resumo || '',
+    publico: curso.publico || '',
+    duracao: curso.duracao || '',
+    formato: curso.formato || '',
+    investimento: curso.investimento || '',
+    certificado: curso.certificado || '',
+    diferenciais: curso.diferenciais || [],
+    cor: curso.cor || '#D8AB55',
     triagem: false,
     ativo: true,
     modelo: 'claude-sonnet-5',
@@ -248,7 +172,14 @@ export const AGENTES_PADRAO = [
     nome: 'Recepção',
     nomeDoAtendente: 'Amanda',
     papel: 'Primeiro atendimento e triagem',
-    cursoId: null,
+    cor: '#C9A24B',
+    resumo: '',
+    publico: '',
+    duracao: '',
+    formato: '',
+    investimento: '',
+    certificado: '',
+    diferenciais: [],
     triagem: true,
     ativo: true,
     modelo: 'claude-sonnet-5',
@@ -265,67 +196,149 @@ export const AGENTES_PADRAO = [
     criadoEm: new Date().toISOString(),
   },
 
-  agenteDeCurso(CURSOS_PADRAO[0], 'Diego', INSTRUCOES_INFORMATICA, [
-    'informática',
-    'informatica',
-    'computador',
-    'básico',
-    'basico',
-    'digitação',
-    'digitacao',
-    'word',
-    'internet',
-    'do zero',
-  ]),
+  agenteEspecialista({
+    id: 'agente-informatica',
+    nome: 'Informática Essencial',
+    nomeDoAtendente: 'Diego',
+    resumo: 'Do zero ao uso confiante do computador, internet e pacote Office.',
+    publico: 'Quem nunca usou computador ou usa com medo de errar.',
+    duracao: '4 meses · 2 encontros por semana',
+    formato: 'Presencial, com computador para cada aluno',
+    investimento: 'Matrícula R$ 90 + 4x R$ 189',
+    certificado: 'Certificado de 120 horas',
+    diferenciais: [
+      'Turmas de no máximo 12 pessoas',
+      'Apostila impressa incluída',
+      'Aula de reposição sem custo',
+    ],
+    cor: '#D8AB55',
+    instrucoes: INSTRUCOES_INFORMATICA,
+    palavrasChave: [
+      'informática',
+      'informatica',
+      'computador',
+      'básico',
+      'basico',
+      'digitação',
+      'digitacao',
+      'word',
+      'internet',
+      'do zero',
+    ],
+  }),
 
-  agenteDeCurso(CURSOS_PADRAO[1], 'Fernanda', INSTRUCOES_EXCEL, [
-    'excel',
-    'planilha',
-    'tabela dinâmica',
-    'tabela dinamica',
-    'procv',
-    'dashboard',
-    'macro',
-  ]),
+  agenteEspecialista({
+    id: 'agente-excel',
+    nome: 'Excel Profissional',
+    nomeDoAtendente: 'Fernanda',
+    resumo: 'Planilhas que resolvem trabalho de verdade: do básico ao dashboard.',
+    publico: 'Quem já mexe no computador e quer subir de cargo ou organizar o próprio negócio.',
+    duracao: '3 meses · 1 encontro por semana',
+    formato: 'Presencial ou ao vivo pela internet',
+    investimento: 'Matrícula R$ 90 + 3x R$ 249',
+    certificado: 'Certificado de 90 horas',
+    diferenciais: [
+      'Fórmulas, tabela dinâmica, gráficos e dashboard',
+      'Projeto final com a planilha do próprio aluno',
+      'Introdução a macros',
+    ],
+    cor: '#4CC38A',
+    instrucoes: INSTRUCOES_EXCEL,
+    palavrasChave: ['excel', 'planilha', 'tabela dinâmica', 'tabela dinamica', 'procv', 'dashboard', 'macro'],
+  }),
 
-  agenteDeCurso(CURSOS_PADRAO[2], 'Juliana', INSTRUCOES_ADMINISTRACAO, [
-    'administrativo',
-    'administração',
-    'administracao',
-    'escritório',
-    'escritorio',
-    'departamento pessoal',
-    'rh',
-    'recepção',
-    'recepcao',
-    'auxiliar',
-  ]),
+  agenteEspecialista({
+    id: 'agente-administracao',
+    nome: 'Rotinas Administrativas',
+    nomeDoAtendente: 'Juliana',
+    resumo: 'Como funciona por dentro um escritório: financeiro, estoque, RH e atendimento.',
+    publico: 'Quem quer o primeiro emprego em escritório ou já trabalha e quer formalizar o que sabe.',
+    duracao: '5 meses · 2 encontros por semana',
+    formato: 'Presencial',
+    investimento: 'Matrícula R$ 90 + 5x R$ 219',
+    certificado: 'Certificado de 200 horas',
+    diferenciais: [
+      'Departamento pessoal e folha na prática',
+      'Emissão de nota fiscal e controle de caixa',
+      'Encaminhamento para vagas parceiras',
+    ],
+    cor: '#56C2E8',
+    instrucoes: INSTRUCOES_ADMINISTRACAO,
+    palavrasChave: [
+      'administrativo',
+      'administração',
+      'administracao',
+      'escritório',
+      'escritorio',
+      'departamento pessoal',
+      'rh',
+      'recepção',
+      'recepcao',
+      'auxiliar',
+    ],
+  }),
 
-  agenteDeCurso(CURSOS_PADRAO[3], 'Gabriel', INSTRUCOES_MARKETING, [
-    'marketing',
-    'instagram',
-    'social media',
-    'tráfego',
-    'trafego',
-    'anúncio',
-    'anuncio',
-    'redes sociais',
-    'vender pela internet',
-  ]),
+  agenteEspecialista({
+    id: 'agente-marketing',
+    nome: 'Marketing Digital',
+    nomeDoAtendente: 'Gabriel',
+    resumo: 'Vender pela internet: conteúdo, tráfego pago e atendimento que fecha.',
+    publico: 'Dono de negócio local e quem quer trabalhar como social media.',
+    duracao: '4 meses · 2 encontros por semana',
+    formato: 'Presencial com laboratório',
+    investimento: 'Matrícula R$ 90 + 4x R$ 279',
+    certificado: 'Certificado de 160 horas',
+    diferenciais: [
+      'Instagram, WhatsApp Business e Google Meu Negócio',
+      'Anúncios com verba real em sala',
+      'Portfólio pronto ao final',
+    ],
+    cor: '#B58CF0',
+    instrucoes: INSTRUCOES_MARKETING,
+    palavrasChave: [
+      'marketing',
+      'instagram',
+      'social media',
+      'tráfego',
+      'trafego',
+      'anúncio',
+      'anuncio',
+      'redes sociais',
+      'vender pela internet',
+    ],
+  }),
 
-  agenteDeCurso(CURSOS_PADRAO[4], 'Helena', INSTRUCOES_DESIGN, [
-    'design',
-    'photoshop',
-    'illustrator',
-    'canva',
-    'arte',
-    'logotipo',
-    'logo',
-    'artes gráficas',
-    'artes graficas',
-    'criação',
-    'criacao',
-  ]),
+  agenteEspecialista({
+    id: 'agente-design',
+    nome: 'Design Gráfico',
+    nomeDoAtendente: 'Helena',
+    resumo: 'Criar peças que vendem — do cartão de visita ao feed inteiro.',
+    publico: 'Quem quer viver de criação ou cuidar do visual do próprio negócio.',
+    duracao: '5 meses · 2 encontros por semana',
+    formato: 'Presencial com laboratório',
+    investimento: 'Matrícula R$ 90 + 5x R$ 289',
+    certificado: 'Certificado de 200 horas',
+    diferenciais: [
+      'Photoshop, Illustrator e Canva Pro',
+      'Teoria da cor e tipografia aplicadas',
+      'Como precificar um trabalho freelance',
+    ],
+    cor: '#F09A3E',
+    instrucoes: INSTRUCOES_DESIGN,
+    palavrasChave: [
+      'design',
+      'photoshop',
+      'illustrator',
+      'canva',
+      'arte',
+      'logotipo',
+      'logo',
+      'artes gráficas',
+      'artes graficas',
+      'criação',
+      'criacao',
+    ],
+  }),
 ]
 
 export const AJUSTES_PADRAO = {

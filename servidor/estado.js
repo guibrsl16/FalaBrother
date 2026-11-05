@@ -1,5 +1,5 @@
 /**
- * Regras de domínio da central de atendimento da Brotherhood Cursos: cursos, agentes, conversas e mensagens.
+ * Regras de domínio da central de atendimento da Brotherhood Cursos: agentes, conversas e mensagens.
  *
  * Este arquivo é a única porta de entrada para os dados. As rotas HTTP e o
  * motor de IA falam com ele, nunca direto com o armazenamento — assim as
@@ -10,13 +10,12 @@ import * as banco from './armazenamento.js'
 import { env, PRECO_SONNET_5_USD_POR_MILHAO as PRECO } from './config.js'
 import { id, agora } from './ids.js'
 import { publicar } from './eventos.js'
-import { AGENTES_PADRAO, AJUSTES_PADRAO, CURSOS_PADRAO } from './sementes.js'
+import { AGENTES_PADRAO, AJUSTES_PADRAO } from './sementes.js'
 
 /* ------------------------------------------------------------------ */
 /* Primeira abertura                                                   */
 /* ------------------------------------------------------------------ */
 
-if (banco.obter('cursos') == null) banco.definir('cursos', CURSOS_PADRAO)
 if (banco.obter('agentes') == null) banco.definir('agentes', AGENTES_PADRAO)
 if (banco.obter('conversas') == null) banco.definir('conversas', [])
 if (banco.obter('ajustes') == null) {
@@ -87,67 +86,6 @@ export function credenciais() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Cursos                                                              */
-/* ------------------------------------------------------------------ */
-
-export function cursos() {
-  return banco.obter('cursos')
-}
-
-export function curso(cursoId) {
-  return cursos().find((c) => c.id === cursoId) || null
-}
-
-export function salvarCurso(dados) {
-  const lista = cursos()
-  if (dados.id) {
-    const i = lista.findIndex((c) => c.id === dados.id)
-    if (i >= 0) {
-      lista[i] = { ...lista[i], ...dados }
-      banco.definir('cursos', lista)
-      publicar('cursos', lista)
-      return lista[i]
-    }
-  }
-  const novo = {
-    id: dados.id || id('curso-'),
-    nome: 'Novo curso',
-    resumo: '',
-    publico: '',
-    duracao: '',
-    formato: '',
-    investimento: '',
-    certificado: '',
-    diferenciais: [],
-    cor: '#D8AB55',
-    ...dados,
-  }
-  lista.push(novo)
-  banco.definir('cursos', lista)
-  publicar('cursos', lista)
-  return novo
-}
-
-export function apagarCurso(cursoId) {
-  const lista = cursos().filter((c) => c.id !== cursoId)
-  banco.definir('cursos', lista)
-  // agentes órfãos viram agentes sem curso, não somem: o texto deles tem valor
-  const ag = agentes()
-  let mexeu = false
-  for (const a of ag) {
-    if (a.cursoId === cursoId) {
-      a.cursoId = null
-      a.ativo = false
-      mexeu = true
-    }
-  }
-  if (mexeu) banco.definir('agentes', ag)
-  publicar('cursos', lista)
-  if (mexeu) publicar('agentes', ag)
-  return lista
-}
-
-/* ------------------------------------------------------------------ */
 /* Agentes                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -162,11 +100,6 @@ export function agente(agenteId) {
 export function agenteDeTriagem() {
   const lista = agentes()
   return lista.find((a) => a.triagem && a.ativo) || lista.find((a) => a.ativo) || null
-}
-
-export function agenteDoCurso(cursoId) {
-  if (!cursoId) return null
-  return agentes().find((a) => a.cursoId === cursoId && a.ativo) || null
 }
 
 export function salvarAgente(dados) {
@@ -189,7 +122,14 @@ export function salvarAgente(dados) {
     nome: 'Novo agente',
     nomeDoAtendente: '',
     papel: '',
-    cursoId: null,
+    cor: '#D8AB55',
+    resumo: '',
+    publico: '',
+    duracao: '',
+    formato: '',
+    investimento: '',
+    certificado: '',
+    diferenciais: [],
     triagem: false,
     ativo: true,
     modelo: 'claude-sonnet-5',
@@ -307,7 +247,6 @@ export function garantirConversa(
     /** aguardando · ia · humano · resolvida */
     estado: 'aguardando',
     agenteId: null,
-    cursoId: null,
     etiquetas: [],
     naoLidas: 0,
     totalMensagens: 0,
@@ -377,7 +316,6 @@ export function sincronizarConversa({ conexaoId, telefone, jid, nomeContato, nom
       /** veio do histórico do celular, não de uma mensagem de agora */
       importada: true,
       agenteId: null,
-      cursoId: null,
       etiquetas: [],
       naoLidas: 0,
       totalMensagens: 0,
@@ -626,12 +564,14 @@ export function indicadores() {
     }
   }
 
-  const porCurso = cursos().map((c) => ({
-    cursoId: c.id,
-    nome: c.nome,
-    cor: c.cor,
-    conversas: lista.filter((v) => v.cursoId === c.id).length,
-  }))
+  const porAgente = agentes()
+    .filter((a) => !a.triagem)
+    .map((a) => ({
+      agenteId: a.id,
+      nome: a.nome,
+      cor: a.cor,
+      conversas: lista.filter((v) => v.agenteId === a.id).length,
+    }))
 
   return {
     total: lista.length,
@@ -645,7 +585,7 @@ export function indicadores() {
     mensagensHoje,
     custoHojeUSD,
     custoMesUSD,
-    porCurso,
+    porAgente,
     agentesAtivos: agentes().filter((a) => a.ativo).length,
   }
 }

@@ -27,7 +27,7 @@ function combina(conversa: Conversa, filtro: Filtro) {
 
 export default function Contatos({ aoIrPara }: { aoIrPara: (tela: string) => void }) {
   const loja = useLoja()
-  const { conversas, cursos } = loja
+  const { conversas, agentes } = loja
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [busca, setBusca] = useState('')
 
@@ -105,7 +105,7 @@ export default function Contatos({ aoIrPara }: { aoIrPara: (tela: string) => voi
         ) : (
           <div className="pilha-sm" style={{ maxHeight: 620, overflowY: 'auto' }}>
             {visiveis.map((c) => {
-              const curso = cursos.find((k) => k.id === c.cursoId)
+              const agente = agentes.find((a) => a.id === c.agenteId && !a.triagem)
               const cliente = ehCliente(c)
               return (
                 <div
@@ -115,7 +115,7 @@ export default function Contatos({ aoIrPara }: { aoIrPara: (tela: string) => voi
                 >
                   <Avatar
                     nome={c.nomeContato}
-                    cor={curso?.cor}
+                    cor={agente?.cor}
                     foto={c.conexaoId && c.telefone ? api.urlFotoContato(c.conexaoId, c.telefone) : undefined}
                   />
                   <div className="crescer recortar">
@@ -127,7 +127,7 @@ export default function Contatos({ aoIrPara }: { aoIrPara: (tela: string) => voi
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--txt-3)' }} className="recortar">
                       {telefoneBonito(c.telefone) || 'número oculto'}
-                      {curso ? ` · ${curso.nome}` : ''}
+                      {c.lead?.curso ? ` · ${c.lead.curso}` : ''}
                     </div>
                   </div>
                   <span className="esmaecido" style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>

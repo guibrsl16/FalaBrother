@@ -53,13 +53,6 @@ export const IconeAgentes = (p: Props) => (
 )
 
 /** Cursos: livro aberto — a mesma figura do brasão, em traço. */
-export const IconeCursos = (p: Props) => (
-  <Svg {...p}>
-    <path d="M12 6.8C10.2 5.4 7.7 5 4 5.4v12.2c3.7-.4 6.2 0 8 1.4 1.8-1.4 4.3-1.8 8-1.4V5.4c-3.7-.4-6.2 0-8 1.4Z" />
-    <path d="M12 6.8V19" />
-  </Svg>
-)
-
 export const IconePainel = (p: Props) => (
   <Svg {...p}>
     <rect x="3" y="3" width="7.5" height="8.5" rx="2" />

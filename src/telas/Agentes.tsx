@@ -1,10 +1,13 @@
 /**
- * Os agentes de IA — um para cada tipo de curso.
+ * Os agentes de IA — um para cada curso, mais a Recepção.
  *
  * A ideia é simples e vale repetir: um agente é um texto de instruções mais
- * um catálogo. Quem escreve bem o texto tem um bom atendente; quem escreve
- * mal tem um robô. Por isso o editor dá tanto espaço para as instruções e
- * traz um banco de provas ao lado, para testar antes de soltar no WhatsApp.
+ * a própria ficha do curso que ele vende (preço, duração, diferenciais —
+ * aba "Ficha"). Tudo o que estiver preenchido ali pode ser dito no
+ * WhatsApp; tudo o que não estiver, o agente é instruído a não inventar.
+ * Quem escreve bem o texto tem um bom atendente; quem escreve mal tem um
+ * robô. Por isso o editor dá tanto espaço para as instruções e traz um
+ * banco de provas ao lado, para testar antes de soltar no WhatsApp.
  */
 import React, { useMemo, useState } from 'react'
 import { useLoja } from '../estado'
@@ -19,9 +22,11 @@ const ESFORCOS: { valor: Esforco; nome: string }[] = [
   { valor: 'high', nome: 'Cuidadoso' },
 ]
 
+const CORES = ['#D8AB55', '#4CC38A', '#56C2E8', '#B58CF0', '#F09A3E', '#39BFAE', '#6E86D6', '#E77FB4']
+
 export default function Agentes() {
   const loja = useLoja()
-  const { agentes, cursos, conversas, canal } = loja
+  const { agentes, conversas, canal } = loja
   const [editando, setEditando] = useState<Agente | null>(null)
   const [testando, setTestando] = useState(false)
 
@@ -33,22 +38,10 @@ export default function Agentes() {
     return mapa
   }, [conversas])
 
-  const cursosSemAgente = useMemo(
-    () => cursos.filter((c) => !agentes.some((a) => a.cursoId === c.id)),
-    [cursos, agentes],
-  )
-
-  async function criar(cursoId?: string) {
-    const curso = cursos.find((c) => c.id === cursoId)
+  async function criar() {
     try {
       const novo = await api.criarAgente({
-        nome: curso ? curso.nome : 'Novo agente',
-        papel: curso ? `Especialista em ${curso.nome}` : '',
-        cursoId: cursoId || null,
-        palavrasChave: curso ? [curso.nome.toLowerCase()] : [],
-        instrucoes: curso
-          ? `Você é o especialista em ${curso.nome} da Brotherhood Cursos.\n\nQUEM CHEGA ATÉ VOCÊ\n\n\nO QUE PERGUNTAR\n-\n\nO QUE DESTACAR\n-`
-          : '',
+        cor: CORES[agentes.length % CORES.length],
         regrasEscalonamento:
           'Transfira para um atendente quando a pessoa pedir desconto, quiser fechar a matrícula, reclamar de algo ou falar de dinheiro já pago.',
       })
@@ -80,33 +73,11 @@ export default function Agentes() {
         </div>
       </div>
 
-      {cursosSemAgente.length > 0 && (
-        <div className="cartao" style={{ marginBottom: 18 }}>
-          <div className="fila quebra" style={{ gap: 10 }}>
-            <div className="crescer">
-              <strong style={{ fontSize: 13.5 }}>
-                {cursosSemAgente.length === 1
-                  ? 'Um curso ainda não tem agente'
-                  : `${cursosSemAgente.length} cursos ainda não têm agente`}
-              </strong>
-              <div style={{ fontSize: 12.5, color: 'var(--txt-3)', marginTop: 3 }}>
-                Sem agente próprio, quem perguntar sobre eles cai na Recepção e a conversa fica genérica.
-              </div>
-            </div>
-            {cursosSemAgente.map((c) => (
-              <button key={c.id} className="btn pequeno" onClick={() => criar(c.id)}>
-                <IconeMais tamanho={13} /> {c.nome}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {agentes.length === 0 ? (
         <Vazio
           simbolo={<IconeAgentes tamanho={36} />}
           titulo="Nenhum agente ainda"
-          texto="Crie um agente por curso. Ele responde no WhatsApp usando o catálogo e as instruções que você escrever."
+          texto="Crie um agente por curso. Ele responde no WhatsApp com a ficha e as instruções que você escrever."
           acao={
             <button className="btn primario" onClick={() => criar()}>
               Criar o primeiro
@@ -115,44 +86,36 @@ export default function Agentes() {
         />
       ) : (
         <div className="grade g3">
-          {agentes.map((a) => {
-            const curso = cursos.find((c) => c.id === a.cursoId)
-            return (
-              <button
-                key={a.id}
-                className={`agente-cartao ${a.ativo ? '' : 'desligado'}`}
-                style={{ '--cor-agente': curso?.cor || 'var(--acento)' } as React.CSSProperties}
-                onClick={() => setEditando(a)}
-              >
-                <div className="topo">
-                  <div className="crescer">
-                    <div className="nome">{a.nome}</div>
-                    <div className="papel">{a.papel || (a.triagem ? 'Triagem' : 'Sem função definida')}</div>
-                  </div>
-                  {a.triagem && <span className="etiqueta dourada">recepção</span>}
+          {agentes.map((a) => (
+            <button
+              key={a.id}
+              className={`agente-cartao ${a.ativo ? '' : 'desligado'}`}
+              style={{ '--cor-agente': a.cor || 'var(--acento)' } as React.CSSProperties}
+              onClick={() => setEditando(a)}
+            >
+              <div className="topo">
+                <div className="crescer">
+                  <div className="nome">{a.nome}</div>
+                  <div className="papel">{a.papel || (a.triagem ? 'Triagem' : 'Sem função definida')}</div>
                 </div>
+                {a.triagem && <span className="etiqueta dourada">recepção</span>}
+              </div>
 
-                <div className="instrucao-previa">
-                  {a.instrucoes?.trim() || 'Sem instruções — este agente vai improvisar. Vale escrever.'}
-                </div>
+              <div className="instrucao-previa">
+                {a.instrucoes?.trim() || 'Sem instruções — este agente vai improvisar. Vale escrever.'}
+              </div>
 
-                <div className="rodape">
-                  <span className={`etiqueta ${a.ativo ? 'verde' : 'vermelha'}`}>
-                    {a.ativo ? 'ativo' : 'desligado'}
-                  </span>
-                  {curso && (
-                    <span className="etiqueta" style={{ color: curso.cor, borderColor: `${curso.cor}55` }}>
-                      {curso.nome}
-                    </span>
-                  )}
-                  <div className="crescer" />
-                  <span style={{ fontSize: 11.5, color: 'var(--txt-3)' }}>
-                    {conversasPorAgente[a.id] || 0} conversas
-                  </span>
-                </div>
-              </button>
-            )
-          })}
+              <div className="rodape">
+                <span className={`etiqueta ${a.ativo ? 'verde' : 'vermelha'}`}>
+                  {a.ativo ? 'ativo' : 'desligado'}
+                </span>
+                <div className="crescer" />
+                <span style={{ fontSize: 11.5, color: 'var(--txt-3)' }}>
+                  {conversasPorAgente[a.id] || 0} conversas
+                </span>
+              </div>
+            </button>
+          ))}
         </div>
       )}
 
@@ -198,11 +161,13 @@ function ModalTestarAgente({ agentes, aoFechar }: { agentes: Agente[]; aoFechar:
 function EditorDeAgente({ agente, aoFechar }: { agente: Agente; aoFechar: () => void }) {
   const loja = useLoja()
   const [rascunho, setRascunho] = useState<Agente>({ ...agente })
-  const [aba, setAba] = useState<'instrucoes' | 'roteamento' | 'faq' | 'teste'>('instrucoes')
+  const [aba, setAba] = useState<'instrucoes' | 'ficha' | 'roteamento' | 'faq' | 'teste'>('instrucoes')
   const [salvando, setSalvando] = useState(false)
 
   function mexer(mudancas: Partial<Agente>) {
     setRascunho((atual) => ({ ...atual, ...mudancas }))
+    // a Recepção não tem ficha de curso — some a aba, então sai dela também
+    if (mudancas.triagem) setAba((atual) => (atual === 'ficha' ? 'instrucoes' : atual))
   }
 
   async function salvar() {
@@ -278,31 +243,20 @@ function EditorDeAgente({ agente, aoFechar }: { agente: Agente; aoFechar: () => 
         <div />
       </div>
 
-      <div className="grade g2">
-        <Campo rotulo="Curso" dica="O agente recebe a ficha completa deste curso.">
-          <select value={rascunho.cursoId || ''} onChange={(e) => mexer({ cursoId: e.target.value || null })}>
-            <option value="">— nenhum (agente geral) —</option>
-            {loja.cursos.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome}
-              </option>
-            ))}
-          </select>
-        </Campo>
-        <div className="pilha-sm" style={{ justifyContent: 'center' }}>
-          <Interruptor ligado={rascunho.ativo} aoMudar={(v) => mexer({ ativo: v })}>
-            Ativo — pode receber conversas
-          </Interruptor>
-          <Interruptor ligado={rascunho.triagem} aoMudar={(v) => mexer({ triagem: v })}>
-            É a Recepção — atende primeiro e roteia
-          </Interruptor>
-        </div>
+      <div className="pilha-sm" style={{ flexDirection: 'row', gap: 24 }}>
+        <Interruptor ligado={rascunho.ativo} aoMudar={(v) => mexer({ ativo: v })}>
+          Ativo — pode receber conversas
+        </Interruptor>
+        <Interruptor ligado={rascunho.triagem} aoMudar={(v) => mexer({ triagem: v })}>
+          É a Recepção — atende primeiro e roteia
+        </Interruptor>
       </div>
 
       <div className="opcoes" style={{ alignSelf: 'flex-start' }}>
         {(
           [
             ['instrucoes', 'Instruções'],
+            ...(rascunho.triagem ? [] : [['ficha', 'Ficha do curso'] as const]),
             ['roteamento', 'Roteamento'],
             ['faq', 'Respostas prontas'],
             ['teste', 'Testar'],
@@ -403,11 +357,90 @@ function EditorDeAgente({ agente, aoFechar }: { agente: Agente; aoFechar: () => 
             </div>
             <ol style={{ paddingLeft: 18, fontSize: 13, color: 'var(--txt-2)', lineHeight: 1.75 }}>
               <li>Se a conversa já tem agente, ele continua.</li>
-              <li>Se o curso de interesse já foi identificado, vai para o agente daquele curso.</li>
               <li>Se a mensagem tem uma das palavras acima, vem para cá.</li>
               <li>Se nada disso acontecer, a Recepção atende e decide.</li>
             </ol>
           </div>
+        </>
+      )}
+
+      {aba === 'ficha' && !rascunho.triagem && (
+        <>
+          <div style={{ fontSize: 12.5, color: 'var(--txt-3)', lineHeight: 1.55, marginBottom: 4 }}>
+            Tudo o que estiver preenchido aqui pode ser dito no WhatsApp; o que não estiver, o agente é
+            instruído a não inventar — ele diz que vai confirmar.
+          </div>
+
+          <Campo rotulo="Cor" dica="Usada no cartão do agente.">
+            <div className="fila quebra">
+              {CORES.map((cor) => (
+                <button
+                  key={cor}
+                  type="button"
+                  onClick={() => mexer({ cor })}
+                  title={cor}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    background: cor,
+                    border: rascunho.cor === cor ? '2px solid var(--txt)' : '1px solid var(--borda)',
+                    cursor: 'pointer',
+                  }}
+                />
+              ))}
+            </div>
+          </Campo>
+
+          <Campo rotulo="Resumo" dica="Uma frase. É o que o agente usa para apresentar o curso.">
+            <input value={rascunho.resumo} onChange={(e) => mexer({ resumo: e.target.value })} />
+          </Campo>
+
+          <Campo rotulo="Para quem é" dica="Ajuda a Recepção a reconhecer quem deve vir para cá.">
+            <input value={rascunho.publico} onChange={(e) => mexer({ publico: e.target.value })} />
+          </Campo>
+
+          <div className="grade g2">
+            <Campo rotulo="Duração">
+              <input
+                value={rascunho.duracao}
+                onChange={(e) => mexer({ duracao: e.target.value })}
+                placeholder="4 meses · 2 encontros por semana"
+              />
+            </Campo>
+            <Campo rotulo="Formato">
+              <input
+                value={rascunho.formato}
+                onChange={(e) => mexer({ formato: e.target.value })}
+                placeholder="Presencial, com computador para cada aluno"
+              />
+            </Campo>
+          </div>
+
+          <div className="grade g2">
+            <Campo rotulo="Investimento" dica="Escreva exatamente como pode ser dito no WhatsApp.">
+              <input
+                value={rascunho.investimento}
+                onChange={(e) => mexer({ investimento: e.target.value })}
+                placeholder="Matrícula R$ 90 + 4x R$ 189"
+              />
+            </Campo>
+            <Campo rotulo="Certificado">
+              <input
+                value={rascunho.certificado}
+                onChange={(e) => mexer({ certificado: e.target.value })}
+                placeholder="Certificado de 120 horas"
+              />
+            </Campo>
+          </div>
+
+          <Campo rotulo="Diferenciais" dica="Um por linha. São os argumentos que o agente usa quando a pessoa hesita.">
+            <textarea
+              value={(rascunho.diferenciais || []).join('\n')}
+              onChange={(e) => mexer({ diferenciais: e.target.value.split('\n').filter((d) => d.trim()) })}
+              rows={4}
+            />
+          </Campo>
         </>
       )}
 

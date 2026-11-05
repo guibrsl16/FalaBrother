@@ -203,15 +203,10 @@ function escolherAgente(conv, ultimoTexto) {
     const atual = estado.agente(conv.agenteId)
     if (atual?.ativo) return atual
   }
-  // 2. curso já identificado antes
-  if (conv.cursoId) {
-    const doCurso = estado.agenteDoCurso(conv.cursoId)
-    if (doCurso) return doCurso
-  }
-  // 3. palavra-chave na própria mensagem — de graça, sem chamar o modelo
+  // 2. palavra-chave na própria mensagem — de graça, sem chamar o modelo
   const porPalavra = agentePorPalavraChave(ultimoTexto || '')
   if (porPalavra) return porPalavra
-  // 4. recepção
+  // 3. recepção
   return estado.agenteDeTriagem()
 }
 
@@ -365,17 +360,13 @@ async function aplicarAcoes(conv, resultado) {
       if (acao.curso) mudancas.lead.curso = acao.curso
       if (acao.etapa) mudancas.lead.etapa = acao.etapa
       if (acao.anotacao) mudancas.lead.anotacao = acao.anotacao
-      if (acao.cursoId) mudancas.cursoId = acao.cursoId
       if (acao.nome && !conv.nomeContato) mudancas.nomeContato = acao.nome
       estado.atualizarConversa(conv.id, mudancas)
     }
 
     if (acao.tipo === 'troca-agente') {
       const destino = estado.agente(acao.paraId)
-      estado.atualizarConversa(conv.id, {
-        agenteId: acao.paraId,
-        cursoId: destino?.cursoId || conv.cursoId,
-      })
+      estado.atualizarConversa(conv.id, { agenteId: acao.paraId })
       estado.registrarMensagem(conv.id, {
         de: 'sistema',
         tipo: 'roteamento',

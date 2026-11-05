@@ -10,7 +10,7 @@ import { Vazio, quando, tituloDaConversa } from '../componentes/Base'
 import { IconePainel } from '../componentes/Icones'
 
 export default function Painel({ aoIrPara }: { aoIrPara: (tela: string) => void }) {
-  const { indicadores, conversas, cursos, conexoes, ajustes } = useLoja()
+  const { indicadores, conversas, conexoes, ajustes } = useLoja()
 
   if (!indicadores) {
     return <Vazio simbolo={<IconePainel tamanho={36} />} titulo="Carregando o painel…" />
@@ -23,7 +23,7 @@ export default function Painel({ aoIrPara }: { aoIrPara: (tela: string) => void 
 
   const caidas = conexoes.filter((c) => c.estado === 'desconectada')
 
-  const maiorCurso = Math.max(1, ...indicadores.porCurso.map((c) => c.conversas))
+  const maiorCurso = Math.max(1, ...indicadores.porAgente.map((c) => c.conversas))
 
   return (
     <>
@@ -168,14 +168,14 @@ export default function Painel({ aoIrPara }: { aoIrPara: (tela: string) => void 
             <div className="cartao-cabecalho">
               <div className="cartao-titulo">Interesse por curso</div>
             </div>
-            {indicadores.porCurso.length === 0 ? (
+            {indicadores.porAgente.length === 0 ? (
               <div style={{ color: 'var(--txt-3)', fontSize: 13 }}>Sem cursos cadastrados.</div>
             ) : (
               <div className="pilha-sm">
-                {[...indicadores.porCurso]
+                {[...indicadores.porAgente]
                   .sort((a, b) => b.conversas - a.conversas)
                   .map((c) => (
-                    <div key={c.cursoId} className="pilha-sm" style={{ gap: 4 }}>
+                    <div key={c.agenteId} className="pilha-sm" style={{ gap: 4 }}>
                       <div className="fila" style={{ fontSize: 12.5 }}>
                         <span className="crescer recortar">{c.nome}</span>
                         <strong className="num">{c.conversas}</strong>
@@ -184,7 +184,7 @@ export default function Painel({ aoIrPara }: { aoIrPara: (tela: string) => void 
                         <i
                           style={{
                             width: `${(c.conversas / maiorCurso) * 100}%`,
-                            background: cursos.find((k) => k.id === c.cursoId)?.cor || 'var(--acento)',
+                            background: c.cor || 'var(--acento)',
                           }}
                         />
                       </div>

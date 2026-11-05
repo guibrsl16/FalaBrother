@@ -15,7 +15,7 @@
  *  - não existe prefill de mensagem do assistente.
  */
 import Anthropic from '@anthropic-ai/sdk'
-import { credenciais, cursos, agentes, curso as buscarCurso } from './estado.js'
+import { credenciais, agentes } from './estado.js'
 import { POSTURA_DA_CASA } from './sementes.js'
 import { MODELO_PADRAO, ESFORCOS } from './config.js'
 
@@ -46,22 +46,23 @@ export function temChave() {
 /* Catálogo em texto                                                   */
 /* ------------------------------------------------------------------ */
 
-function fichaDoCurso(c) {
-  const linhas = [`CURSO: ${c.nome}`]
-  if (c.resumo) linhas.push(`Resumo: ${c.resumo}`)
-  if (c.publico) linhas.push(`Para quem é: ${c.publico}`)
-  if (c.duracao) linhas.push(`Duração: ${c.duracao}`)
-  if (c.formato) linhas.push(`Formato: ${c.formato}`)
-  if (c.investimento) linhas.push(`Investimento: ${c.investimento}`)
-  if (c.certificado) linhas.push(`Certificado: ${c.certificado}`)
-  if (c.diferenciais?.length) linhas.push(`Diferenciais: ${c.diferenciais.join('; ')}`)
+/** A ficha de um agente-especialista é a própria ficha do curso que ele representa. */
+function fichaDoAgente(a) {
+  const linhas = [`CURSO: ${a.nome}`]
+  if (a.resumo) linhas.push(`Resumo: ${a.resumo}`)
+  if (a.publico) linhas.push(`Para quem é: ${a.publico}`)
+  if (a.duracao) linhas.push(`Duração: ${a.duracao}`)
+  if (a.formato) linhas.push(`Formato: ${a.formato}`)
+  if (a.investimento) linhas.push(`Investimento: ${a.investimento}`)
+  if (a.certificado) linhas.push(`Certificado: ${a.certificado}`)
+  if (a.diferenciais?.length) linhas.push(`Diferenciais: ${a.diferenciais.join('; ')}`)
   return linhas.join('\n')
 }
 
 function catalogoCompleto() {
-  const lista = cursos()
+  const lista = agentes().filter((a) => !a.triagem)
   if (!lista.length) return 'O catálogo ainda está vazio.'
-  return lista.map(fichaDoCurso).join('\n\n')
+  return lista.map(fichaDoAgente).join('\n\n')
 }
 
 /* ------------------------------------------------------------------ */
@@ -92,9 +93,8 @@ function montarSistema(agente, contexto) {
     )
   }
 
-  const meuCurso = agente.cursoId ? buscarCurso(agente.cursoId) : null
-  if (meuCurso) {
-    doAgente.push('', '=== O CURSO QUE VOCÊ REPRESENTA ===', fichaDoCurso(meuCurso))
+  if (!agente.triagem) {
+    doAgente.push('', '=== O CURSO QUE VOCÊ REPRESENTA ===', fichaDoAgente(agente))
   }
 
   if (agente.perguntasFrequentes?.length) {
@@ -151,7 +151,9 @@ function montarSistema(agente, contexto) {
 /* ------------------------------------------------------------------ */
 
 function ferramentas() {
-  const idsDeCursos = cursos().map((c) => c.id)
+  const idsDeEspecialistas = agentes()
+    .filter((a) => !a.triagem && a.ativo)
+    .map((a) => a.id)
   return [
     {
       name: 'transferir_para_atendente',
@@ -184,10 +186,10 @@ function ferramentas() {
         type: 'object',
         properties: {
           nome: { type: 'string', description: 'Nome que a pessoa usou. Vazio se ela não disse.' },
-          cursoId: {
+          agenteId: {
             type: 'string',
-            enum: idsDeCursos.length ? idsDeCursos : ['sem-curso'],
-            description: 'Identificador do curso de interesse.',
+            enum: idsDeEspecialistas.length ? idsDeEspecialistas : ['sem-especialista'],
+            description: 'Identificador do agente especialista do curso de interesse.',
           },
           etapa: {
             type: 'string',
@@ -199,7 +201,7 @@ function ferramentas() {
             description: 'Um detalhe útil para a equipe. Ex.: só pode à noite; trabalha em loja.',
           },
         },
-        required: ['nome', 'cursoId', 'etapa', 'anotacao'],
+        required: ['nome', 'agenteId', 'etapa', 'anotacao'],
         additionalProperties: false,
       },
       strict: true,
@@ -211,14 +213,14 @@ function ferramentas() {
       input_schema: {
         type: 'object',
         properties: {
-          cursoId: {
+          agenteId: {
             type: 'string',
-            enum: idsDeCursos.length ? idsDeCursos : ['sem-curso'],
-            description: 'Curso do especialista que deve assumir.',
+            enum: idsDeEspecialistas.length ? idsDeEspecialistas : ['sem-especialista'],
+            description: 'Especialista que deve assumir.',
           },
           motivo: { type: 'string', description: 'Uma frase dizendo por quê.' },
         },
-        required: ['cursoId', 'motivo'],
+        required: ['agenteId', 'motivo'],
         additionalProperties: false,
       },
       strict: true,
@@ -382,11 +384,10 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
       }
 
       if (chamada.name === 'registrar_interesse') {
-        const c = entrada.cursoId ? buscarCurso(entrada.cursoId) : null
+        const especialista = entrada.agenteId ? agentes().find((a) => a.id === entrada.agenteId) : null
         const registro = {
           nome: entrada.nome || '',
-          cursoId: c ? c.id : null,
-          curso: c ? c.nome : '',
+          curso: especialista ? especialista.nome : '',
           etapa: entrada.etapa || 'novo',
           anotacao: entrada.anotacao || '',
         }
@@ -400,7 +401,7 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
       }
 
       if (chamada.name === 'passar_para_outro_agente') {
-        const destino = agentes().find((a) => a.cursoId === entrada.cursoId && a.ativo)
+        const destino = agentes().find((a) => a.id === entrada.agenteId && a.ativo)
         if (destino && destino.id !== agenteAtual.id && trocas < 2) {
           trocouDeAgente = destino
           acoes.push({

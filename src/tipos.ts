@@ -6,19 +6,6 @@ export type QuemFalou = 'cliente' | 'agente' | 'atendente' | 'sistema'
 
 export type Esforco = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
-export interface Curso {
-  id: string
-  nome: string
-  resumo: string
-  publico: string
-  duracao: string
-  formato: string
-  investimento: string
-  certificado: string
-  diferenciais: string[]
-  cor: string
-}
-
 export interface PerguntaFrequente {
   pergunta: string
   resposta: string
@@ -30,7 +17,15 @@ export interface Agente {
   /** Nome de pessoa que o agente usa para se apresentar no WhatsApp. Ex.: "Amanda". */
   nomeDoAtendente: string
   papel: string
-  cursoId: string | null
+  /** A ficha do curso que este agente representa — vazio para a Recepção. */
+  cor: string
+  resumo: string
+  publico: string
+  duracao: string
+  formato: string
+  investimento: string
+  certificado: string
+  diferenciais: string[]
   triagem: boolean
   ativo: boolean
   modelo: string
@@ -66,7 +61,6 @@ export interface Conversa {
   canal: string
   estado: EstadoConversa
   agenteId: string | null
-  cursoId: string | null
   etiquetas: string[]
   naoLidas: number
   totalMensagens?: number
@@ -134,13 +128,12 @@ export interface Indicadores {
   mensagensHoje: number
   custoHojeUSD: number
   custoMesUSD: number
-  porCurso: { cursoId: string; nome: string; cor: string; conversas: number }[]
+  porAgente: { agenteId: string; nome: string; cor: string; conversas: number }[]
   agentesAtivos: number
 }
 
 export interface EstadoInicial {
   ajustes: Ajustes
-  cursos: Curso[]
   agentes: Agente[]
   conversas: Conversa[]
   indicadores: Indicadores

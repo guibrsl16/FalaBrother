@@ -54,7 +54,7 @@ e-mail, senha inicial e o papel:
 
 | Papel | O que pode |
 |---|---|
-| **Atende** | Tudo do dia a dia: conversas, painel, agentes, cursos, canal, ajustes |
+| **Atende** | Tudo do dia a dia: conversas, painel, agentes, canal, ajustes |
 | **Administra** | O mesmo, mais conectar/remover números em Conexões e cadastrar, remover e redefinir senha e 2 etapas das pessoas |
 
 Cada pessoa troca a própria senha em **Ajustes → Minha conta**. Não há
@@ -214,10 +214,9 @@ a porta 8787. Sem isso preenchido, esta ligação simplesmente fica desligada.
 Quando chega uma mensagem, nesta ordem:
 
 1. Se a conversa já tem agente, ele continua.
-2. Se o curso de interesse já foi identificado, vai para o agente daquele curso.
-3. Se a mensagem tem uma **palavra-chave** de algum agente, vai direto para ele —
+2. Se a mensagem tem uma **palavra-chave** de algum agente, vai direto para ele —
    sem gastar chamada de IA para decidir.
-4. Se nada disso, a **Recepção** atende, descobre o que a pessoa quer e passa
+3. Se nada disso, a **Recepção** atende, descobre o que a pessoa quer e passa
    a conversa para o especialista.
 
 Antes de responder, o sistema espera alguns segundos (ajustável). Isso
@@ -248,8 +247,7 @@ não é uma ação que existe.
 | **Conexões** | Os números de WhatsApp: conectar por QR Code, ver quem está de pé, reconectar |
 | **Conversas** | O dia a dia: lista, histórico, resposta manual, assumir e devolver |
 | **Painel** | A fila, o que a IA respondeu hoje e o interesse por curso |
-| **Agentes** | Um agente por curso: instruções, roteamento, respostas prontas e banco de provas |
-| **Cursos** | O catálogo. É a fonte de verdade dos agentes — o que não está aqui, eles não inventam |
+| **Agentes** | Um agente por curso: instruções, a ficha do curso (preço, duração, diferenciais), roteamento, respostas prontas e banco de provas |
 | **API oficial** | Opcional: credenciais da Cloud API da Meta e endereço do webhook |
 | **Ajustes** | Chave da IA, espera, memória, horário, tema, equipe e a própria senha |
 
@@ -266,8 +264,7 @@ Tudo em arquivos JSON na pasta `dados/`, dentro do projeto:
 ```
 dados/
   ajustes.json          chave da IA, credenciais, horário, tema
-  cursos.json           o catálogo
-  agentes.json          os agentes e suas instruções
+  agentes.json          os agentes, suas instruções e a ficha do curso de cada um
   conversas.json        índice das conversas (sem o histórico)
   conversas/<id>.json   o histórico de cada conversa
   usuarios.json         quem entra (senha e códigos de recuperação só como hash)
@@ -304,11 +301,11 @@ entrega a interface, a API e o webhook.
 
 ## Sobre o catálogo que já vem preenchido
 
-Os cinco cursos e os agentes que aparecem na primeira abertura são um
-**ponto de partida**, não o catálogo real da escola. Nomes, preços, cargas
-horárias e diferenciais são editáveis na tela **Cursos** — e devem ser
-ajustados antes de ligar o WhatsApp, porque é literalmente o que os agentes
-vão dizer para os alunos.
+Os cinco agentes que aparecem na primeira abertura são um **ponto de
+partida**, não o catálogo real da escola. Nome, preço, carga horária e
+diferenciais de cada um são editáveis na tela **Agentes**, aba "Ficha do
+curso" — e devem ser ajustados antes de ligar o WhatsApp, porque é
+literalmente o que os agentes vão dizer para os alunos.
 
 ---
 

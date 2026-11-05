@@ -23,7 +23,7 @@ import type { Conversa } from '../tipos'
 
 export default function Dashboard({ aoIrPara }: { aoIrPara: (tela: string) => void }) {
   const loja = useLoja()
-  const { conversas, cursos } = loja
+  const { conversas, agentes } = loja
   const [filtro, setFiltro] = useState('todas')
 
   // Lead = conversa em que já se sabe algo de quem está do outro lado. Um
@@ -54,20 +54,21 @@ export default function Dashboard({ aoIrPara }: { aoIrPara: (tela: string) => vo
 
   const porCurso = useMemo(
     () =>
-      cursos
-        .map((c) => {
-          const doCurso = leads.filter((l) => l.cursoId === c.id)
+      agentes
+        .filter((a) => !a.triagem)
+        .map((a) => {
+          const doCurso = leads.filter((l) => l.agenteId === a.id)
           return {
-            cursoId: c.id,
-            nome: c.nome,
-            cor: c.cor,
+            agenteId: a.id,
+            nome: a.nome,
+            cor: a.cor,
             leads: doCurso.length,
             matriculados: doCurso.filter((l) => l.lead?.etapa === 'matriculado').length,
           }
         })
         .filter((c) => c.leads > 0)
         .sort((a, b) => b.leads - a.leads),
-    [cursos, leads],
+    [agentes, leads],
   )
   const maiorCurso = Math.max(1, ...porCurso.map((c) => c.leads))
 
@@ -147,7 +148,6 @@ export default function Dashboard({ aoIrPara }: { aoIrPara: (tela: string) => vo
           ) : (
             <div className="pilha-sm" style={{ maxHeight: 520, overflowY: 'auto' }}>
               {listaFiltrada.map((l) => {
-                const curso = cursos.find((c) => c.id === l.cursoId)
                 const fechado = l.lead?.etapa === 'matriculado' || l.lead?.etapa === 'perdido'
                 return (
                   <div
@@ -163,7 +163,7 @@ export default function Dashboard({ aoIrPara }: { aoIrPara: (tela: string) => vo
                         <SeloEtapa etapa={l.lead?.etapa} />
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--txt-3)' }} className="recortar">
-                        {curso?.nome || l.lead?.curso || 'curso ainda não identificado'} ·{' '}
+                        {l.lead?.curso || 'curso ainda não identificado'} ·{' '}
                         {telefoneBonito(l.telefone) || 'número oculto'}
                       </div>
                     </div>
@@ -228,7 +228,7 @@ export default function Dashboard({ aoIrPara }: { aoIrPara: (tela: string) => vo
             ) : (
               <div className="pilha-sm">
                 {porCurso.map((c) => (
-                  <div key={c.cursoId} className="pilha-sm" style={{ gap: 4 }}>
+                  <div key={c.agenteId} className="pilha-sm" style={{ gap: 4 }}>
                     <div className="fila" style={{ fontSize: 12.5 }}>
                       <span className="crescer recortar">{c.nome}</span>
                       <strong className="num">

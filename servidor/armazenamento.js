@@ -1,6 +1,6 @@
 /**
- * Guarda os dados do sistema — usuários, conversas, mensagens, cursos,
- * agentes, ajustes.
+ * Guarda os dados do sistema — usuários, conversas, mensagens, agentes,
+ * ajustes.
  *
  * Dois jeitos de guardar, escolhidos pela variável DATABASE_URL:
  *
@@ -88,7 +88,7 @@ function arquivoMensagens(conversaId) {
 /* ------------------------------------------------------------------ */
 
 /** As coleções simples: um registro para cada uma (arquivo, ou linha da tabela `colecoes`). */
-const COLECOES = ['ajustes', 'cursos', 'agentes', 'conversas', 'usuarios', 'sessoes', 'conexoes']
+const COLECOES = ['ajustes', 'agentes', 'conversas', 'usuarios', 'sessoes', 'conexoes']
 
 const memoria = {}
 const cacheMensagens = new Map()
@@ -124,10 +124,10 @@ const gravacaoPendente = new Set()
 let timerGravacao = null
 
 async function gravarColecao(nome) {
-  // cursos e agentes mudam pouco — logar aqui ajuda a rastrear uma gravação
-  // inesperada (ex.: memória antiga de antes de um restart sobrescrevendo o
-  // que outra pessoa/processo gravou depois).
-  if (nome === 'cursos' || nome === 'agentes') {
+  // agentes muda pouco — logar aqui ajuda a rastrear uma gravação inesperada
+  // (ex.: memória antiga de antes de um restart sobrescrevendo o que outra
+  // pessoa/processo gravou depois).
+  if (nome === 'agentes') {
     const valor = memoria[nome]
     console.log(`[dados] gravando ${nome} (${Array.isArray(valor) ? valor.length : 0} itens)`)
   }
@@ -187,7 +187,7 @@ export function definir(nome, valor) {
 
 /** Existe conteúdo salvo? Serve para saber se é a primeira vez que abre. */
 export function vazio() {
-  return memoria.cursos == null && memoria.agentes == null
+  return memoria.agentes == null
 }
 
 /* -------------------------- mensagens ----------------------------- */

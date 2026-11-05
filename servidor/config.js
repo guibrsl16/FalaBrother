@@ -47,7 +47,7 @@ export const PASTA_DADOS = process.env.PASTA_DADOS
   : path.join(RAIZ, 'dados')
 
 /**
- * Banco de dados (Postgres/Supabase) onde ficam usuários, conversas, cursos
+ * Banco de dados (Postgres/Supabase) onde ficam usuários, conversas, agentes
  * etc. Vazio = volta para os arquivos JSON em PASTA_DADOS (modo antigo). As
  * credenciais do WhatsApp (Baileys) e o cache de mídia continuam sempre em
  * disco — a biblioteca exige pasta, e não é dado de negócio, é a chave da
