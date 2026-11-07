@@ -389,6 +389,13 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
   const acoes = []
   const uso = { entrada: 0, saida: 0, cacheLido: 0, cacheEscrito: 0 }
   const conversa = [...mensagensApi]
+  // Texto que o agente já escreveu em voltas anteriores desta mesma resposta
+  // (ex.: respondeu a parte do próprio curso e, na mesma mensagem, chamou
+  // registrar_interesse ou passar_para_outro_agente). Sem isto, esse texto
+  // ficava só no histórico que o modelo vê — nunca saía pelo WhatsApp — e o
+  // próprio agente seguia a conversa como se já tivesse dito aquilo, deixando
+  // a pessoa sem receber metade da resposta.
+  const partesJaEscritas = []
 
   for (let volta = 0; volta < MAX_VOLTAS; volta += 1) {
     const pedido = {
@@ -418,8 +425,8 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
 
     if (resposta.stop_reason === 'refusal') {
       return {
-        texto: '',
-        partes: [],
+        texto: partesJaEscritas.length ? partesJaEscritas.join('\n\n') : '',
+        partes: partesJaEscritas,
         recusa: resposta.stop_details?.explanation || 'A resposta foi recusada por segurança.',
         transferir: {
           motivo: 'outro',
@@ -441,9 +448,10 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
 
     if (!chamadas.length) {
       if (texto && valorForaDoCatalogo(texto, agenteAtual)) {
+        const partesComAviso = [...partesJaEscritas, AVISO_VALOR_INVENTADO]
         return {
-          texto: AVISO_VALOR_INVENTADO,
-          partes: [AVISO_VALOR_INVENTADO],
+          texto: partesComAviso.join('\n\n'),
+          partes: partesComAviso,
           transferir: {
             motivo: 'fora_do_catalogo',
             resumo: 'O agente ia citar um valor que não está na ficha do curso — passando para confirmar com a equipe.',
@@ -453,7 +461,7 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
           agenteId: agenteAtual.id,
         }
       }
-      const partes = dividirEmBaloes(texto)
+      const partes = [...partesJaEscritas, ...dividirEmBaloes(texto)]
       return {
         texto: partes.length ? partes.join('\n\n') : texto,
         partes: partes.length ? partes : texto ? [texto] : [],
@@ -462,6 +470,30 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
         uso,
         agenteId: agenteAtual.id,
       }
+    }
+
+    // O agente pode escrever a resposta de verdade NA MESMA volta em que
+    // chama uma ferramenta (ex.: responde a parte do seu curso e, na mesma
+    // mensagem, chama passar_para_outro_agente para o resto; ou comenta algo
+    // enquanto registra o interesse). Esse texto é tão real quanto o da
+    // volta final — guarda para não se perder quando o agente trocar ou
+    // quando a ferramenta não gerar mensagem nenhuma por conta própria.
+    if (texto) {
+      if (valorForaDoCatalogo(texto, agenteAtual)) {
+        const partesComAviso = [...partesJaEscritas, AVISO_VALOR_INVENTADO]
+        return {
+          texto: partesComAviso.join('\n\n'),
+          partes: partesComAviso,
+          transferir: {
+            motivo: 'fora_do_catalogo',
+            resumo: 'O agente ia citar um valor que não está na ficha do curso — passando para confirmar com a equipe.',
+          },
+          acoes,
+          uso,
+          agenteId: agenteAtual.id,
+        }
+      }
+      partesJaEscritas.push(...dividirEmBaloes(texto))
     }
 
     // devolve a fala do assistente inteira (texto + chamadas) para o histórico
@@ -573,11 +605,10 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
         .map((b) => b.text)
         .join('\n')
         .trim()
-      textoFinal = textoFinal || texto
       if (textoFinal && valorForaDoCatalogo(textoFinal, agenteAtual)) {
         textoFinal = AVISO_VALOR_INVENTADO
       }
-      const partesFinal = dividirEmBaloes(textoFinal)
+      const partesFinal = [...partesJaEscritas, ...dividirEmBaloes(textoFinal)]
       return {
         texto: partesFinal.length ? partesFinal.join('\n\n') : textoFinal,
         partes: partesFinal.length ? partesFinal : textoFinal ? [textoFinal] : [],
@@ -590,8 +621,8 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
   }
 
   return {
-    texto: '',
-    partes: [],
+    texto: partesJaEscritas.length ? partesJaEscritas.join('\n\n') : '',
+    partes: partesJaEscritas,
     transferir: {
       motivo: 'outro',
       resumo: 'O agente ficou dando voltas sem concluir. Vale um olhar humano.',
