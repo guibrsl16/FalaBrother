@@ -281,11 +281,10 @@ export async function responderConversa(conversaId) {
   const ajustes = estado.ajustes()
 
   if (!ajustes.iaLigada) return
-  // "Com você" pausa a IA — mas só para quem já é cliente (matriculado). Um
-  // lead que escreve de novo sempre volta para a IA, mesmo que alguém da
-  // equipe tenha respondido à mão antes: ninguém deve ficar esperando um
-  // humano que pode demorar enquanto ainda está decidindo se vai matricular.
-  if (conv.estado === 'humano' && conv.lead?.etapa === 'matriculado') return
+  // "Com você" pausa a IA para qualquer conversa, lead ou cliente: quem
+  // assumiu (pela tela, pelo celular ou gravando áudio) decidiu que vai
+  // responder, e a IA não deve escrever por cima dessa pessoa.
+  if (conv.estado === 'humano') return
 
   const historico = estado.mensagens(conversaId)
   const ultima = [...historico].reverse().find((m) => m.de === 'cliente')
