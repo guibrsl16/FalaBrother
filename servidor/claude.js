@@ -313,7 +313,40 @@ function valorForaDoCatalogo(texto, agenteAtual) {
   return false
 }
 
+/**
+ * Nenhum agente recebe telefone, endereço ou contato de verdade no próprio
+ * prompt (quem passa isso é um atendente humano, depois de transferir) —
+ * então qualquer sequência com cara de telefone na resposta é, por
+ * definição, inventada. Sem "permitidos" aqui: ao contrário do valor, não
+ * existe um telefone correto para liberar.
+ */
+const PADRAO_TELEFONE_INVENTADO = /(?:\+?55\s*)?\(?\d{2}\)?[\s.-]?9?\d{4}[\s.-]?\d{4}\b/
+
+/**
+ * Toda ficha de agente diz, na seção NUNCA FAÇA, para nunca prometer
+ * resultado garantido (emprego, aprovação, nota, fluência). É regra
+ * repetida em todo agente — por isso dá pra checar no código, igual ao
+ * valor: se a palavra aparecer na resposta, não é a ficha dizendo isso,
+ * é o modelo quebrando a própria instrução.
+ */
+const PADRAO_PROMESSA_ABSOLUTA = /\bgarant\w*\b/i
+
+function violacaoDeSeguranca(texto, agenteAtual) {
+  if (valorForaDoCatalogo(texto, agenteAtual)) {
+    return { motivo: 'fora_do_catalogo', aviso: AVISO_VALOR_INVENTADO }
+  }
+  if (PADRAO_TELEFONE_INVENTADO.test(texto)) {
+    return { motivo: 'fora_do_catalogo', aviso: AVISO_CONTATO_INVENTADO }
+  }
+  if (PADRAO_PROMESSA_ABSOLUTA.test(texto)) {
+    return { motivo: 'outro', aviso: AVISO_PROMESSA_ABSOLUTA }
+  }
+  return null
+}
+
 const AVISO_VALOR_INVENTADO = 'Deixa eu confirmar esse número certinho com a equipe antes de te passar — só um instante.'
+const AVISO_CONTATO_INVENTADO = 'Deixa eu confirmar esse contato certinho com a equipe antes de te passar — só um instante.'
+const AVISO_PROMESSA_ABSOLUTA = 'Isso eu prefiro confirmar com a equipe antes de te garantir algo — só um instante.'
 
 /* ------------------------------------------------------------------ */
 /* Resposta em vários balões                                           */
@@ -474,14 +507,15 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
     const chamadas = resposta.content.filter((b) => b.type === 'tool_use')
 
     if (!chamadas.length) {
-      if (texto && valorForaDoCatalogo(texto, agenteAtual)) {
-        const partesComAviso = [...partesJaEscritas, AVISO_VALOR_INVENTADO]
+      const violacao = texto && violacaoDeSeguranca(texto, agenteAtual)
+      if (violacao) {
+        const partesComAviso = [...partesJaEscritas, violacao.aviso]
         return {
           texto: partesComAviso.join('\n\n'),
           partes: partesComAviso,
           transferir: {
-            motivo: 'fora_do_catalogo',
-            resumo: 'O agente ia citar um valor que não está na ficha do curso — passando para confirmar com a equipe.',
+            motivo: violacao.motivo,
+            resumo: 'O agente ia dizer algo que não deveria — passando para confirmar com a equipe.',
           },
           acoes,
           uso,
@@ -506,14 +540,15 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
     // volta final — guarda para não se perder quando o agente trocar ou
     // quando a ferramenta não gerar mensagem nenhuma por conta própria.
     if (texto) {
-      if (valorForaDoCatalogo(texto, agenteAtual)) {
-        const partesComAviso = [...partesJaEscritas, AVISO_VALOR_INVENTADO]
+      const violacao = violacaoDeSeguranca(texto, agenteAtual)
+      if (violacao) {
+        const partesComAviso = [...partesJaEscritas, violacao.aviso]
         return {
           texto: partesComAviso.join('\n\n'),
           partes: partesComAviso,
           transferir: {
-            motivo: 'fora_do_catalogo',
-            resumo: 'O agente ia citar um valor que não está na ficha do curso — passando para confirmar com a equipe.',
+            motivo: violacao.motivo,
+            resumo: 'O agente ia dizer algo que não deveria — passando para confirmar com a equipe.',
           },
           acoes,
           uso,
@@ -632,8 +667,9 @@ export async function rodarAgente({ agente, mensagensApi, contexto }) {
         .map((b) => b.text)
         .join('\n')
         .trim()
-      if (textoFinal && valorForaDoCatalogo(textoFinal, agenteAtual)) {
-        textoFinal = AVISO_VALOR_INVENTADO
+      const violacaoFinal = textoFinal && violacaoDeSeguranca(textoFinal, agenteAtual)
+      if (violacaoFinal) {
+        textoFinal = violacaoFinal.aviso
       }
       const partesFinal = [...partesJaEscritas, ...dividirEmBaloes(textoFinal)]
       return {
