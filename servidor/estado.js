@@ -136,7 +136,11 @@ export function salvarAgente(dados) {
     certificado: '',
     diferenciais: [],
     triagem: false,
-    ativo: true,
+    // Começa inativo: um agente recém-criado ainda não tem curso nem regras
+    // (ver claude.js, agenteConfigurado) — se ficasse ativo de cara, entraria
+    // no catálogo de todo mundo e seria alvo de transferência antes de
+    // alguém escrever uma linha de instrução nele.
+    ativo: false,
     modelo: 'claude-sonnet-5',
     esforco: 'low',
     raciocinio: false,

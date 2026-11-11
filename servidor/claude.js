@@ -59,8 +59,19 @@ function fichaDoAgente(a) {
   return linhas.join('\n')
 }
 
+/**
+ * Um agente recém-criado (botão "Novo agente") nasce sem papel, sem regras e
+ * sem ficha nenhuma. Enquanto estiver assim, ele não pode aparecer no
+ * catálogo nem ser alvo de transferência — senão vira um "curso" fantasma
+ * que confunde os outros agentes, ou um especialista sem nenhuma instrução
+ * respondendo pelo WhatsApp.
+ */
+function agenteConfigurado(a) {
+  return Boolean(a.papel || a.regras || a.introducao || a.valores || a.instrucoes)
+}
+
 function catalogoCompleto() {
-  const lista = agentes().filter((a) => !a.triagem)
+  const lista = agentes().filter((a) => !a.triagem && agenteConfigurado(a))
   if (!lista.length) return 'O catálogo ainda está vazio.'
   return lista.map(fichaDoAgente).join('\n\n')
 }
@@ -181,7 +192,7 @@ function montarSistema(agente, contexto) {
 
 function ferramentas() {
   const idsDeEspecialistas = agentes()
-    .filter((a) => !a.triagem && a.ativo)
+    .filter((a) => !a.triagem && a.ativo && agenteConfigurado(a))
     .map((a) => a.id)
   return [
     {
@@ -272,9 +283,25 @@ function ferramentas() {
 const PADRAO_QUANTIDADE_SENSIVEL =
   /R\$\s*(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s*x\b|(\d+(?:[.,]\d+)?)\s*(?:hora|horas|m[eê]s|meses|pessoa|pessoas|aluno|alunos|vaga|vagas|encontro|encontros|parcela|parcelas)\b/gi
 
+/**
+ * Tudo que o PRÓPRIO agente já escreveu de antemão sobre o curso: a ficha
+ * estruturada (aba "Ficha") mais papel, regras, introdução, valores,
+ * instruções e perguntas frequentes (aba de texto livre). Muitos agentes têm
+ * carga horária, idade ou turma escritas só no texto livre, com a ficha
+ * estruturada em branco — se o número permitido viesse só da ficha, o
+ * agente seria barrado de repetir o que o próprio prompt manda ele dizer.
+ */
+function textoAutoralDoAgente(agente) {
+  const partes = [fichaDoAgente(agente), agente.papel, agente.regras, agente.introducao, agente.valores, agente.instrucoes]
+  for (const item of agente.perguntasFrequentes || []) {
+    if (item?.pergunta) partes.push(item.pergunta, item.resposta || '')
+  }
+  return partes.filter(Boolean).join('\n')
+}
+
 function numerosDaFicha(agente) {
   if (!agente || agente.triagem) return new Set()
-  return new Set((fichaDoAgente(agente).match(/\d+(?:[.,]\d+)?/g) || []).map((n) => n.replace(',', '.')))
+  return new Set((textoAutoralDoAgente(agente).match(/\d+(?:[.,]\d+)?/g) || []).map((n) => n.replace(',', '.')))
 }
 
 function valorForaDoCatalogo(texto, agenteAtual) {
